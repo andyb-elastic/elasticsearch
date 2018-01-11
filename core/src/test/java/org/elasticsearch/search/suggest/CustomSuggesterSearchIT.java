@@ -54,7 +54,7 @@ import static org.hamcrest.Matchers.is;
 /**
  * Integration test for registering a custom suggester.
  */
-@ClusterScope(scope= Scope.SUITE, numDataNodes =1)
+@ClusterScope(scope= Scope.SUITE, numDataNodes = 2)
 public class CustomSuggesterSearchIT extends ESIntegTestCase {
     @Override
     protected Collection<Class<? extends Plugin>> nodePlugins() {
