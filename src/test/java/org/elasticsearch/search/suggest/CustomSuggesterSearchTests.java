@@ -39,7 +39,7 @@ import static org.hamcrest.Matchers.is;
 /**
  *
  */
-@ClusterScope(scope= Scope.SUITE, numDataNodes =1)
+@ClusterScope(scope= Scope.SUITE, numDataNodes = 2)
 public class CustomSuggesterSearchTests extends ElasticsearchIntegrationTest {
 
     @Override
