@@ -33,11 +33,15 @@ Vagrant.configure(2) do |config|
     vbox.cpus = Integer(ENV['VAGRANT_CPUS'] || 4)
   end
 
+  # Vagrant and ruby stdlib expand '.' differently, so look for the build
+  # in the directory containing the Vagrantfile
+  vagrantfile_dir = File.expand_path('..', __FILE__)
+
   # Switch the default share for the project root from /vagrant to
   # /elasticsearch because /vagrant is confusing when there is a project inside
   # the elasticsearch project called vagrant....
-  config.vm.synced_folder '.', '/vagrant', disabled: true
-  config.vm.synced_folder '.', '/elasticsearch'
+  config.vm.synced_folder vagrantfile_dir, '/vagrant', disabled: true
+  config.vm.synced_folder vagrantfile_dir, '/elasticsearch'
 
   # Expose project directory. Note that VAGRANT_CWD may not be the same as Dir.pwd
   PROJECT_DIR = ENV['VAGRANT_PROJECT_DIR'] || Dir.pwd
@@ -119,6 +123,30 @@ Vagrant.configure(2) do |config|
     config.vm.define box, define_opts do |config|
       config.vm.box = 'elastic/sles-12-x86_64'
       sles_common config, box
+    end
+  end
+
+  windows_2012r2_box = ENV['VAGRANT_WINDOWS_2012R2_BOX']
+  if windows_2012r2_box && windows_2012r2_box.empty? == false
+    'windows-2012r2'.tap do |box|
+      config.vm.define box, define_opts do |config|
+        config.vm.box = windows_2012r2_box
+        windows_common config, box
+      end
+    end
+  end
+
+  windows_2016_box = ENV['VAGRANT_WINDOWS_2016_BOX']
+  if windows_2016_box && windows_2016_box.empty? == false
+    'windows-2016'.tap do |box|
+      config.vm.define box, define_opts do |config|
+        config.vm.box = windows_2016_box
+        # https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
+        config.vm.provision 'enable long paths', type: 'shell', inline: <<-SHELL
+          Set-ItemProperty -Path "HKLM:/SYSTEM/CurrentControlSet/Control/Filesystem/" -Name "LongPathsEnabled" -Value 1
+        SHELL
+        windows_common config, box
+      end
     end
   end
 end
@@ -349,5 +377,123 @@ Defaults   env_keep += "BATS_TESTS"
 Defaults   env_keep += "BATS_ARCHIVES"
 SUDOERS_VARS
     chmod 0440 /etc/sudoers.d/elasticsearch_vars
+  SHELL
+end
+
+def windows_common(config, name)
+  config.vm.provision 'markerfile', type: 'shell', inline: <<-SHELL
+    $ErrorActionPreference = "Stop"
+    New-Item C:/is_vagrant_vm -ItemType file -Force | Out-Null
+  SHELL
+
+  config.vm.provision 'clean es installs in tmp', run: 'always', type: 'shell', inline: <<-SHELL
+    Remove-Item -Recurse -Force C:\\tmp\\elasticsearch*
+  SHELL
+
+  config.vm.provision 'set prompt', type: 'shell', inline: <<-SHELL
+    $ErrorActionPreference = "Stop"
+    $ps_prompt = 'function Prompt { "#{name}:$($ExecutionContext.SessionState.Path.CurrentLocation)>" }'
+    $ps_prompt | Out-File $PsHome/Microsoft.PowerShell_profile.ps1
+  SHELL
+
+  # Windows' system APIs limit paths to 260 characters. In server 2016 we can raise this limit,
+  # (see LongPathsEnabled above) but not in server 2012r2. This adds a powershell module that has basic
+  # copy and delete command that can handle long paths
+  config.vm.provision 'long path shim module', type: 'shell' do |s|
+    s.privileged = false
+    s.inline = <<-SHELL
+      $ErrorActionPreference = "Stop"
+      $longPathScript = @'
+#{powershell_long_path_module}
+'@
+      $ModuleDir = "C:/Users/vagrant/Documents/WindowsPowerShell/Modules/LongPathShims"
+      $ModuleFile = "$ModuleDir/LongPathShims.psm1"
+      if (-Not (Test-Path "$ModuleDir")) {
+        New-Item "$ModuleDir" -ItemType Directory | Out-Null
+      }
+      $longPathScript | Out-File "$ModuleFile"
+    SHELL
+  end
+
+  powershell_install_deps config
+end
+
+# Powershell's filesystem commands cannot handle long paths by default. This module implements
+# the required commands by calling Robocopy [1], a Windows system utility for moving files around
+# that can handle long paths by default. Robocopy returns unusual exit codes [2] so we call it in
+# a wrapper that converts them to what we'd normally expect.
+#
+# The Remove-Long-Path function works by syncing the contents of an empty directory to the
+# delete target, which has the effect of recursively deleting it.
+#
+# [1] https://ss64.com/nt/robocopy.html
+# [2] https://ss64.com/nt/robocopy-exit.html
+def powershell_long_path_module
+  <<-SHELL
+    function Copy-Long-Path {
+      param(
+        [string]$Source,
+        [string]$Destination
+      )
+
+      robocopy "$Source" "$Destination" /E /COPY:DT /DCOPY:T /NFL /NDL /NJH /NJS /NC /NS /NP
+      Handle-Robocopy-Exit-Code $LASTEXITCODE
+    }
+
+    function Remove-Long-Path {
+      param(
+        [string]$Target
+      )
+
+      $EmptyDir = "C:\\intentionally_empty"
+
+      try {
+        New-Item "$EmptyDir" -ItemType Directory | Out-Null
+        # There doesn't appear to be a way to silence output about files that are purged,
+        # so just sent it to null as writing it to the terminal is very slow
+        robocopy "$EmptyDir" "$Target" /PURGE /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null
+        $RobocopyExitCode = $LASTEXITCODE
+        Remove-Item "$Target" -Recurse
+        Handle-Robocopy-Exit-Code $RobocopyExitCode
+      } finally {
+        Remove-Item "$EmptyDir" -Recurse
+      }
+    }
+
+    function Handle-Robocopy-Exit-Code {
+      param(
+        [int]$ExitCode
+      )
+
+      Write-Verbose "robocopy returned exit code $ExitCode"
+      if ($ExitCode -ge 7) {
+        Write-Error "robocopy encountered an error and returned exit code $ExitCode"
+      }
+    }
+  SHELL
+end
+
+# Just check that java is installed - when other dependencies are needed
+# in the future, this is where they'll go
+def powershell_install_deps(config)
+  config.vm.provision 'install deps', type: 'shell', inline: <<-SHELL
+    $ErrorActionPreference = "Stop"
+
+    function Installed {
+      Param(
+        [string]$command
+      )
+
+      try {
+        Get-Command $command
+        return $true
+      } catch {
+        return $false
+      }
+    }
+
+    if (-Not (Installed java)) {
+      Write-Error "java is not installed"
+    }
   SHELL
 end
