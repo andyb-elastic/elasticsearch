@@ -34,7 +34,7 @@ import static org.hamcrest.Matchers.lessThanOrEqualTo;
 public class CompletionSuggestionTests extends ESTestCase {
 
     public void testToReduce() throws Exception {
-        List<Suggest.Suggestion<CompletionSuggestion.Entry>> shardSuggestions = new ArrayList<>();
+        List<Suggest.Suggestion> shardSuggestions = new ArrayList<>();
         int nShards = randomIntBetween(1, 10);
         String name = randomAlphaOfLength(10);
         int size = randomIntBetween(3, 5);
@@ -46,8 +46,8 @@ public class CompletionSuggestionTests extends ESTestCase {
         int totalResults = randomIntBetween(0, 5) * nShards;
         float maxScore = randomIntBetween(totalResults, totalResults*2);
         for (int i = 0; i < totalResults; i++) {
-            Suggest.Suggestion<CompletionSuggestion.Entry> suggestion = randomFrom(shardSuggestions);
-            CompletionSuggestion.Entry entry = suggestion.getEntries().get(0);
+            Suggest.Suggestion suggestion = randomFrom(shardSuggestions);
+            CompletionSuggestion.Entry entry = (CompletionSuggestion.Entry) suggestion.getEntries().get(0);
             if (entry.getOptions().size() < size) {
                 entry.addOption(new CompletionSuggestion.Entry.Option(i, new Text(""),
                     maxScore - i, Collections.emptyMap()));

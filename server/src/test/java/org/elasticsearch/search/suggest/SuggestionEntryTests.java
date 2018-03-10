@@ -57,7 +57,7 @@ public class SuggestionEntryTests extends ESTestCase {
      * Create a randomized Suggestion.Entry
      */
     @SuppressWarnings("unchecked")
-    public static <O extends Option> Entry<O> createTestItem(Class<? extends Entry> entryType) {
+    public static <O extends Option> Entry createTestItem(Class<? extends Entry> entryType) {
         Text entryText = new Text(randomAlphaOfLengthBetween(5, 15));
         int offset = randomInt();
         int length = randomInt();
@@ -93,7 +93,7 @@ public class SuggestionEntryTests extends ESTestCase {
     @SuppressWarnings("unchecked")
     private void doTestFromXContent(boolean addRandomFields) throws IOException {
         for (Class<? extends Entry> entryType : ENTRY_PARSERS.keySet()) {
-            Entry<Option> entry = createTestItem(entryType);
+            Entry entry = createTestItem(entryType);
             XContentType xContentType = randomFrom(XContentType.values());
             boolean humanReadable = randomBoolean();
             BytesReference originalBytes = toShuffledXContent(entry, xContentType, ToXContent.EMPTY_PARAMS, humanReadable);
@@ -109,7 +109,7 @@ public class SuggestionEntryTests extends ESTestCase {
             } else {
                 mutated = originalBytes;
             }
-            Entry<Option> parsed;
+            Entry parsed;
             try (XContentParser parser = createParser(xContentType.xContent(), mutated)) {
                 ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.nextToken(), parser::getTokenLocation);
                 parsed = ENTRY_PARSERS.get(entry.getClass()).apply(parser);
@@ -130,7 +130,7 @@ public class SuggestionEntryTests extends ESTestCase {
 
     public void testToXContent() throws IOException {
         Option option = new Option(new Text("someText"), new Text("somethingHighlighted"), 1.3f, true);
-        Entry<Option> entry = new Entry<>(new Text("entryText"), 42, 313);
+        Entry entry = new Entry(new Text("entryText"), 42, 313);
         entry.addOption(option);
         BytesReference xContent = toXContent(entry, XContentType.JSON, randomBoolean());
         assertEquals(
@@ -146,7 +146,7 @@ public class SuggestionEntryTests extends ESTestCase {
 
         org.elasticsearch.search.suggest.term.TermSuggestion.Entry.Option termOption =
                 new org.elasticsearch.search.suggest.term.TermSuggestion.Entry.Option(new Text("termSuggestOption"), 42, 3.13f);
-        entry = new Entry<>(new Text("entryText"), 42, 313);
+        entry = new Entry(new Text("entryText"), 42, 313);
         entry.addOption(termOption);
         xContent = toXContent(entry, XContentType.JSON, randomBoolean());
         assertEquals(
@@ -162,7 +162,7 @@ public class SuggestionEntryTests extends ESTestCase {
         org.elasticsearch.search.suggest.completion.CompletionSuggestion.Entry.Option completionOption =
                 new org.elasticsearch.search.suggest.completion.CompletionSuggestion.Entry.Option(-1, new Text("completionOption"),
                         3.13f, Collections.singletonMap("key", Collections.singleton("value")));
-        entry = new Entry<>(new Text("entryText"), 42, 313);
+        entry = new Entry(new Text("entryText"), 42, 313);
         entry.addOption(completionOption);
         xContent = toXContent(entry, XContentType.JSON, randomBoolean());
         assertEquals(

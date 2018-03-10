@@ -33,7 +33,7 @@ import java.io.IOException;
 /**
  * Suggestion entry returned from the {@link PhraseSuggester}.
  */
-public class PhraseSuggestion extends Suggest.Suggestion<PhraseSuggestion.Entry> {
+public class PhraseSuggestion extends Suggest.Suggestion {
 
     public static final String NAME = "phrase";
     public static final int TYPE = 3;
@@ -66,7 +66,7 @@ public class PhraseSuggestion extends Suggest.Suggestion<PhraseSuggestion.Entry>
         return suggestion;
     }
 
-    public static class Entry extends Suggestion.Entry<Suggestion.Entry.Option> {
+    public static class Entry extends Suggestion.Entry {
 
         protected double cutoffScore = Double.MIN_VALUE;
 
@@ -86,7 +86,7 @@ public class PhraseSuggestion extends Suggest.Suggestion<PhraseSuggestion.Entry>
         }
 
         @Override
-        protected void merge(Suggestion.Entry<Suggestion.Entry.Option> other) {
+        protected void merge(Suggestion.Entry other) {
             super.merge(other);
             // If the cluster contains both pre 0.90.4 and post 0.90.4 nodes then we'll see Suggestion.Entry
             // objects being merged with PhraseSuggestion.Entry objects.  We merge Suggestion.Entry objects

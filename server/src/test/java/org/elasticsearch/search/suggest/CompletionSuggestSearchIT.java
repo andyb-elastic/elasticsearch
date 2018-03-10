@@ -238,15 +238,17 @@ public class CompletionSuggestSearchIT extends ESIntegTestCase {
         CompletionSuggestionBuilder prefix = SuggestBuilders.completionSuggestion(FIELD).prefix("sugg").size(numDocs);
 
         SearchResponse searchResponse = client().prepareSearch(INDEX).suggest(new SuggestBuilder().addSuggestion("foo", prefix)).get();
-        CompletionSuggestion completionSuggestion = searchResponse.getSuggest().getSuggestion("foo");
-        CompletionSuggestion.Entry options = completionSuggestion.getEntries().get(0);
+        CompletionSuggestion completionSuggestion = (CompletionSuggestion) searchResponse.getSuggest().getSuggestion("foo");
+        CompletionSuggestion.Entry options = (CompletionSuggestion.Entry) completionSuggestion.getEntries().get(0);
         assertThat(options.getOptions().size(), equalTo(numDocs));
         int id = numDocs;
-        for (CompletionSuggestion.Entry.Option option : options) {
-            assertThat(option.getText().toString(), equalTo("suggestion" + id));
-            assertThat(option.getHit(), hasId("" + id));
-            assertThat(option.getHit(), hasScore((id)));
-            assertNotNull(option.getHit().getSourceAsMap());
+
+        for (Suggest.Suggestion.Entry.Option option : options) {
+            final CompletionSuggestion.Entry.Option completionOption = (CompletionSuggestion.Entry.Option) option;
+            assertThat(completionOption.getText().toString(), equalTo("suggestion" + id));
+            assertThat(completionOption.getHit(), hasId("" + id));
+            assertThat(completionOption.getHit(), hasScore((id)));
+            assertNotNull(completionOption.getHit().getSourceAsMap());
             id--;
         }
     }
@@ -273,15 +275,17 @@ public class CompletionSuggestSearchIT extends ESIntegTestCase {
         SearchResponse searchResponse = client().prepareSearch(INDEX).suggest(
             new SuggestBuilder().addSuggestion("foo", prefix)
         ).setFetchSource(false).get();
-        CompletionSuggestion completionSuggestion = searchResponse.getSuggest().getSuggestion("foo");
-        CompletionSuggestion.Entry options = completionSuggestion.getEntries().get(0);
+        CompletionSuggestion completionSuggestion = (CompletionSuggestion) searchResponse.getSuggest().getSuggestion("foo");
+        CompletionSuggestion.Entry options = (CompletionSuggestion.Entry) completionSuggestion.getEntries().get(0);
         assertThat(options.getOptions().size(), equalTo(numDocs));
         int id = numDocs;
-        for (CompletionSuggestion.Entry.Option option : options) {
-            assertThat(option.getText().toString(), equalTo("suggestion" + id));
-            assertThat(option.getHit(), hasId("" + id));
-            assertThat(option.getHit(), hasScore((id)));
-            assertNull(option.getHit().getSourceAsMap());
+
+        for (Suggest.Suggestion.Entry.Option option : options) {
+            CompletionSuggestion.Entry.Option completionOption = (CompletionSuggestion.Entry.Option) option;
+            assertThat(completionOption.getText().toString(), equalTo("suggestion" + id));
+            assertThat(completionOption.getHit(), hasId("" + id));
+            assertThat(completionOption.getHit(), hasScore((id)));
+            assertNull(completionOption.getHit().getSourceAsMap());
             id--;
         }
     }
@@ -310,16 +314,18 @@ public class CompletionSuggestSearchIT extends ESIntegTestCase {
         SearchResponse searchResponse = client().prepareSearch(INDEX).suggest(
             new SuggestBuilder().addSuggestion("foo", prefix)
         ).setFetchSource("a", "b").get();
-        CompletionSuggestion completionSuggestion = searchResponse.getSuggest().getSuggestion("foo");
-        CompletionSuggestion.Entry options = completionSuggestion.getEntries().get(0);
+        CompletionSuggestion completionSuggestion = (CompletionSuggestion) searchResponse.getSuggest().getSuggestion("foo");
+        CompletionSuggestion.Entry options = (CompletionSuggestion.Entry) completionSuggestion.getEntries().get(0);
         assertThat(options.getOptions().size(), equalTo(numDocs));
         int id = numDocs;
-        for (CompletionSuggestion.Entry.Option option : options) {
-            assertThat(option.getText().toString(), equalTo("suggestion" + id));
-            assertThat(option.getHit(), hasId("" + id));
-            assertThat(option.getHit(), hasScore((id)));
-            assertNotNull(option.getHit().getSourceAsMap());
-            Set<String> sourceFields = option.getHit().getSourceAsMap().keySet();
+
+        for (Suggest.Suggestion.Entry.Option option : options) {
+            CompletionSuggestion.Entry.Option completionOption = (CompletionSuggestion.Entry.Option) option;
+            assertThat(completionOption.getText().toString(), equalTo("suggestion" + id));
+            assertThat(completionOption.getHit(), hasId("" + id));
+            assertThat(completionOption.getHit(), hasScore((id)));
+            assertNotNull(completionOption.getHit().getSourceAsMap());
+            Set<String> sourceFields = completionOption.getHit().getSourceAsMap().keySet();
             assertThat(sourceFields, contains("a"));
             assertThat(sourceFields, not(contains("b")));
             id--;
@@ -919,13 +925,13 @@ public class CompletionSuggestSearchIT extends ESIntegTestCase {
         assertAllSuccessful(searchResponse);
 
         List<String> suggestionNames = new ArrayList<>();
-        for (Suggest.Suggestion<? extends Suggest.Suggestion.Entry<? extends Suggest.Suggestion.Entry.Option>> suggestion : iterableAsArrayList(searchResponse.getSuggest())) {
+        for (Suggest.Suggestion suggestion : iterableAsArrayList(searchResponse.getSuggest())) {
             suggestionNames.add(suggestion.getName());
         }
         String expectFieldInResponseMsg = String.format(Locale.ROOT, "Expected suggestion named %s in response, got %s", name, suggestionNames);
         assertThat(expectFieldInResponseMsg, searchResponse.getSuggest().getSuggestion(name), is(notNullValue()));
 
-        Suggest.Suggestion<Suggest.Suggestion.Entry<Suggest.Suggestion.Entry.Option>> suggestion = searchResponse.getSuggest().getSuggestion(name);
+        Suggest.Suggestion suggestion = searchResponse.getSuggest().getSuggestion(name);
 
         List<String> suggestionList = getNames(suggestion.getEntries().get(0));
         List<Suggest.Suggestion.Entry.Option> options = suggestion.getEntries().get(0).getOptions();
@@ -945,7 +951,7 @@ public class CompletionSuggestSearchIT extends ESIntegTestCase {
         }
     }
 
-    private static List<String> getNames(Suggest.Suggestion.Entry<Suggest.Suggestion.Entry.Option> suggestEntry) {
+    private static List<String> getNames(Suggest.Suggestion.Entry suggestEntry) {
         List<String> names = new ArrayList<>();
         for (Suggest.Suggestion.Entry.Option entry : suggestEntry.getOptions()) {
             names.add(entry.getText().string());

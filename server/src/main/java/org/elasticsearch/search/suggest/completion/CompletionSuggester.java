@@ -48,7 +48,7 @@ public class CompletionSuggester extends Suggester<CompletionSuggestionContext> 
     private CompletionSuggester() {}
 
     @Override
-    protected Suggest.Suggestion<? extends Suggest.Suggestion.Entry<? extends Suggest.Suggestion.Entry.Option>> innerExecute(String name,
+    protected Suggest.Suggestion innerExecute(String name,
             final CompletionSuggestionContext suggestionContext, final IndexSearcher searcher, CharsRefBuilder spare) throws IOException {
         if (suggestionContext.getFieldType() != null) {
             final CompletionFieldMapper.CompletionFieldType fieldType = suggestionContext.getFieldType();

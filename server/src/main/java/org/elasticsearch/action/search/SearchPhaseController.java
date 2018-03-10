@@ -163,7 +163,7 @@ public final class SearchPhaseController extends AbstractComponent {
             return SortedTopDocs.EMPTY;
         }
         final Collection<TopDocs> topDocs = bufferedTopDocs == null ? new ArrayList<>() : bufferedTopDocs;
-        final Map<String, List<Suggestion<CompletionSuggestion.Entry>>> groupedCompletionSuggestions = new HashMap<>();
+        final Map<String, List<Suggestion>> groupedCompletionSuggestions = new HashMap<>();
         for (SearchPhaseResult sortedResult : results) { // TODO we can move this loop into the reduce call to only loop over this once
             /* We loop over all results once, group together the completion suggestions if there are any and collect relevant
              * top docs results. Each top docs gets it's shard index set on all top docs to simplify top docs merging down the road
@@ -183,7 +183,7 @@ public final class SearchPhaseController extends AbstractComponent {
                 Suggest shardSuggest = queryResult.suggest();
                 for (CompletionSuggestion suggestion : shardSuggest.filter(CompletionSuggestion.class)) {
                     suggestion.setShardIndex(sortedResult.getShardIndex());
-                    List<Suggestion<CompletionSuggestion.Entry>> suggestions =
+                    List<Suggestion> suggestions =
                         groupedCompletionSuggestions.computeIfAbsent(suggestion.getName(), s -> new ArrayList<>());
                     suggestions.add(suggestion);
                 }
@@ -196,9 +196,9 @@ public final class SearchPhaseController extends AbstractComponent {
             ScoreDoc[] scoreDocs = mergedScoreDocs;
             if (groupedCompletionSuggestions.isEmpty() == false) {
                 int numSuggestDocs = 0;
-                List<Suggestion<? extends Entry<? extends Entry.Option>>> completionSuggestions =
+                List<Suggestion> completionSuggestions =
                     new ArrayList<>(groupedCompletionSuggestions.size());
-                for (List<Suggestion<CompletionSuggestion.Entry>> groupedSuggestions : groupedCompletionSuggestions.values()) {
+                for (List<Suggestion> groupedSuggestions : groupedCompletionSuggestions.values()) {
                     final CompletionSuggestion completionSuggestion = CompletionSuggestion.reduceTo(groupedSuggestions);
                     assert completionSuggestion != null;
                     numSuggestDocs += completionSuggestion.getOptions().size();
@@ -486,7 +486,7 @@ public final class SearchPhaseController extends AbstractComponent {
             }
             if (hasSuggest) {
                 assert result.suggest() != null;
-                for (Suggestion<? extends Suggestion.Entry<? extends Suggestion.Entry.Option>> suggestion : result.suggest()) {
+                for (Suggestion suggestion : result.suggest()) {
                     List<Suggestion> suggestionList = groupedSuggestions.computeIfAbsent(suggestion.getName(), s -> new ArrayList<>());
                     suggestionList.add(suggestion);
                 }

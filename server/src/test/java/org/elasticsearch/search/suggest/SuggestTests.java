@@ -81,7 +81,7 @@ public class SuggestTests extends ESTestCase {
 
     public static Suggest createTestItem() {
         int numEntries = randomIntBetween(0, 5);
-        List<Suggestion<? extends Entry<? extends Option>>> suggestions = new ArrayList<>();
+        List<Suggestion> suggestions = new ArrayList<>();
         for (int i = 0; i < numEntries; i++) {
             suggestions.add(SuggestionTests.createTestItem());
         }
@@ -106,7 +106,7 @@ public class SuggestTests extends ESTestCase {
         }
         assertEquals(suggest.size(), parsed.size());
         for (Suggestion suggestion : suggest) {
-            Suggestion<? extends Entry<? extends Option>> parsedSuggestion = parsed.getSuggestion(suggestion.getName());
+            Suggestion parsedSuggestion = parsed.getSuggestion(suggestion.getName());
             assertNotNull(parsedSuggestion);
             assertEquals(suggestion.getClass(), parsedSuggestion.getClass());
         }
@@ -115,9 +115,9 @@ public class SuggestTests extends ESTestCase {
 
     public void testToXContent() throws IOException {
         Option option = new Option(new Text("someText"), new Text("somethingHighlighted"), 1.3f, true);
-        Entry<Option> entry = new Entry<>(new Text("entryText"), 42, 313);
+        Entry entry = new Entry(new Text("entryText"), 42, 313);
         entry.addOption(option);
-        Suggestion<Entry<Option>> suggestion = new Suggestion<>("suggestionName", 5);
+        Suggestion suggestion = new Suggestion("suggestionName", 5);
         suggestion.addTerm(entry);
         Suggest suggest = new Suggest(Collections.singletonList(suggestion));
         BytesReference xContent = toXContent(suggest, XContentType.JSON, randomBoolean());
@@ -138,7 +138,7 @@ public class SuggestTests extends ESTestCase {
     }
 
     public void testFilter() throws Exception {
-        List<Suggest.Suggestion<? extends Suggest.Suggestion.Entry<? extends Suggest.Suggestion.Entry.Option>>> suggestions;
+        List<Suggest.Suggestion> suggestions;
         CompletionSuggestion completionSuggestion = new CompletionSuggestion(randomAlphaOfLength(10), 2, false);
         PhraseSuggestion phraseSuggestion = new PhraseSuggestion(randomAlphaOfLength(10), 2);
         TermSuggestion termSuggestion = new TermSuggestion(randomAlphaOfLength(10), 2, SortBy.SCORE);
@@ -156,7 +156,7 @@ public class SuggestTests extends ESTestCase {
     }
 
     public void testSuggestionOrdering() throws Exception {
-        List<Suggest.Suggestion<? extends Suggest.Suggestion.Entry<? extends Suggest.Suggestion.Entry.Option>>> suggestions;
+        List<Suggest.Suggestion> suggestions;
         suggestions = new ArrayList<>();
         int n = randomIntBetween(2, 5);
         for (int i = 0; i < n; i++) {
@@ -164,7 +164,7 @@ public class SuggestTests extends ESTestCase {
         }
         Collections.shuffle(suggestions, random());
         Suggest suggest = new Suggest(suggestions);
-        List<Suggest.Suggestion<? extends Suggest.Suggestion.Entry<? extends Suggest.Suggestion.Entry.Option>>> sortedSuggestions;
+        List<Suggest.Suggestion> sortedSuggestions;
         sortedSuggestions = new ArrayList<>(suggestions);
         sortedSuggestions.sort((o1, o2) -> o1.getName().compareTo(o2.getName()));
         List<CompletionSuggestion> completionSuggestions = suggest.filter(CompletionSuggestion.class);

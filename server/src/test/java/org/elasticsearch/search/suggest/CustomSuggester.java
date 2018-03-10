@@ -33,19 +33,19 @@ public class CustomSuggester extends Suggester<CustomSuggester.CustomSuggestions
 
     // This is a pretty dumb implementation which returns the original text + fieldName + custom config option + 12 or 123
     @Override
-    public Suggest.Suggestion<? extends Suggest.Suggestion.Entry<? extends Suggest.Suggestion.Entry.Option>> innerExecute(String name, CustomSuggestionsContext suggestion, IndexSearcher searcher, CharsRefBuilder spare) throws IOException {
+    public Suggest.Suggestion innerExecute(String name, CustomSuggestionsContext suggestion, IndexSearcher searcher, CharsRefBuilder spare) throws IOException {
         // Get the suggestion context
         String text = suggestion.getText().utf8ToString();
 
         // create two suggestions with 12 and 123 appended
-        Suggest.Suggestion<Suggest.Suggestion.Entry<Suggest.Suggestion.Entry.Option>> response = new Suggest.Suggestion<>(name, suggestion.getSize());
+        Suggest.Suggestion response = new Suggest.Suggestion(name, suggestion.getSize());
 
         String firstSuggestion = String.format(Locale.ROOT, "%s-%s-%s-%s", text, suggestion.getField(), suggestion.options.get("suffix"), "12");
-        Suggest.Suggestion.Entry<Suggest.Suggestion.Entry.Option> resultEntry12 = new Suggest.Suggestion.Entry<>(new Text(firstSuggestion), 0, text.length() + 2);
+        Suggest.Suggestion.Entry resultEntry12 = new Suggest.Suggestion.Entry(new Text(firstSuggestion), 0, text.length() + 2);
         response.addTerm(resultEntry12);
 
         String secondSuggestion = String.format(Locale.ROOT, "%s-%s-%s-%s", text, suggestion.getField(), suggestion.options.get("suffix"), "123");
-        Suggest.Suggestion.Entry<Suggest.Suggestion.Entry.Option> resultEntry123 = new Suggest.Suggestion.Entry<>(new Text(secondSuggestion), 0, text.length() + 3);
+        Suggest.Suggestion.Entry resultEntry123 = new Suggest.Suggestion.Entry(new Text(secondSuggestion), 0, text.length() + 3);
         response.addTerm(resultEntry123);
 
         return response;

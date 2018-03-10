@@ -35,6 +35,7 @@ import org.elasticsearch.search.suggest.Suggest;
 import org.elasticsearch.search.suggest.Suggest.Suggestion;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -43,6 +44,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.elasticsearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
@@ -64,7 +66,7 @@ import static org.elasticsearch.search.suggest.Suggest.COMPARATOR;
  * }
  *
  */
-public final class CompletionSuggestion extends Suggest.Suggestion<CompletionSuggestion.Entry> {
+public final class CompletionSuggestion extends Suggest.Suggestion {
 
     public static final String NAME = "completion";
 
@@ -106,11 +108,25 @@ public final class CompletionSuggestion extends Suggest.Suggestion<CompletionSug
      * @return the result options for the suggestion
      */
     public List<Entry.Option> getOptions() {
-        if (entries.isEmpty() == false) {
-            assert entries.size() == 1 : "CompletionSuggestion must have only one entry";
-            return entries.get(0).getOptions();
+
+        final Optional<Entry> entry = getEntry();
+        if (entry.isPresent()) {
+            List<Entry.Option> options = new ArrayList<>();
+            for (Suggest.Suggestion.Entry.Option o : entries.get(0).getOptions()) {
+                options.add((Entry.Option)o);
+            }
+            return options;
         } else {
             return Collections.emptyList();
+        }
+    }
+
+    public Optional<Entry> getEntry() {
+        if (entries.isEmpty()) {
+            return Optional.empty();
+        } else {
+            assert entries.size() == 1 : "CompletionSuggestion must have only one entry";
+            return Optional.of((Entry) entries.get(0));
         }
     }
 
@@ -159,12 +175,13 @@ public final class CompletionSuggestion extends Suggest.Suggestion<CompletionSug
      * Reduces suggestions to a single suggestion containing at most
      * top {@link CompletionSuggestion#getSize()} options across <code>toReduce</code>
      */
-    public static CompletionSuggestion reduceTo(List<Suggest.Suggestion<Entry>> toReduce) {
+    public static CompletionSuggestion reduceTo(List<Suggest.Suggestion> toReduce) {
         if (toReduce.isEmpty()) {
             return null;
         } else {
             final CompletionSuggestion leader = (CompletionSuggestion) toReduce.get(0);
-            final Entry leaderEntry = leader.getEntries().get(0);
+            assert leader.getEntry().isPresent();
+            final Entry leaderEntry = leader.getEntry().get();
             final String name = leader.getName();
             if (toReduce.size() == 1) {
                 return leader;
@@ -175,7 +192,7 @@ public final class CompletionSuggestion extends Suggest.Suggestion<CompletionSug
                 OptionPriorityQueue priorityQueue = new OptionPriorityQueue(leader.getSize(), COMPARATOR);
                 // Dedup duplicate suggestions (based on the surface form) if skip duplicates is activated
                 final CharArraySet seenSurfaceForms = leader.skipDuplicates ? new CharArraySet(leader.getSize(), false) : null;
-                for (Suggest.Suggestion<Entry> suggestion : toReduce) {
+                for (Suggest.Suggestion suggestion : toReduce) {
                     assert suggestion.getName().equals(name) : "name should be identical across all suggestions";
                     for (Entry.Option option : ((CompletionSuggestion) suggestion).getOptions()) {
                         if (leader.skipDuplicates) {
@@ -204,7 +221,7 @@ public final class CompletionSuggestion extends Suggest.Suggestion<CompletionSug
     }
 
     @Override
-    public Suggest.Suggestion<Entry> reduce(List<Suggest.Suggestion<Entry>> toReduce) {
+    public Suggest.Suggestion reduce(List<Suggest.Suggestion> toReduce) {
         return reduceTo(toReduce);
     }
 
@@ -231,7 +248,7 @@ public final class CompletionSuggestion extends Suggest.Suggestion<CompletionSug
         return new Entry();
     }
 
-    public static final class Entry extends Suggest.Suggestion.Entry<CompletionSuggestion.Entry.Option> {
+    public static final class Entry extends Suggest.Suggestion.Entry {
 
         public Entry(Text text, int offset, int length) {
             super(text, offset, length);

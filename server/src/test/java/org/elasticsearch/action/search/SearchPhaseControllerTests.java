@@ -89,7 +89,7 @@ public class SearchPhaseControllerTests extends ESTestCase {
         ScoreDoc[] sortedDocs = searchPhaseController.sortDocs(true, results.asList(), null, new SearchPhaseController.TopDocsStats(),
             from, size)
             .scoreDocs;
-        for (Suggest.Suggestion<?> suggestion : reducedSuggest(results)) {
+        for (Suggest.Suggestion suggestion : reducedSuggest(results)) {
             int suggestionSize = suggestion.getEntries().get(0).getOptions().size();
             accumulatedLength += suggestionSize;
         }
@@ -159,18 +159,20 @@ public class SearchPhaseControllerTests extends ESTestCase {
             }
             int suggestSize = 0;
             for (Suggest.Suggestion s : reducedQueryPhase.suggest) {
-                Stream<CompletionSuggestion.Entry> stream = s.getEntries().stream();
-                suggestSize += stream.collect(Collectors.summingInt(e -> e.getOptions().size()));
+                Optional<CompletionSuggestion.Entry> entry = ((CompletionSuggestion) s).getEntry();
+                if (entry.isPresent()) {
+                    suggestSize += entry.get().getOptions().size();
+                }
             }
             assertThat(suggestSize, lessThanOrEqualTo(maxSuggestSize));
             assertThat(mergedResponse.hits().getHits().length, equalTo(reducedQueryPhase.scoreDocs.length - suggestSize));
             Suggest suggestResult = mergedResponse.suggest();
-            for (Suggest.Suggestion<?> suggestion : reducedQueryPhase.suggest) {
+            for (Suggest.Suggestion suggestion : reducedQueryPhase.suggest) {
                 assertThat(suggestion, instanceOf(CompletionSuggestion.class));
                 if (suggestion.getEntries().get(0).getOptions().size() > 0) {
-                    CompletionSuggestion suggestionResult = suggestResult.getSuggestion(suggestion.getName());
+                    CompletionSuggestion suggestionResult = (CompletionSuggestion) suggestResult.getSuggestion(suggestion.getName());
                     assertNotNull(suggestionResult);
-                    List<CompletionSuggestion.Entry.Option> options = suggestionResult.getEntries().get(0).getOptions();
+                    List<CompletionSuggestion.Entry.Option> options = suggestionResult.getOptions();
                     assertThat(options.size(), equalTo(suggestion.getEntries().get(0).getOptions().size()));
                     for (CompletionSuggestion.Entry.Option option : options) {
                         assertNotNull(option.getHit());
@@ -238,12 +240,12 @@ public class SearchPhaseControllerTests extends ESTestCase {
     }
 
     private Suggest reducedSuggest(AtomicArray<SearchPhaseResult> results) {
-        Map<String, List<Suggest.Suggestion<CompletionSuggestion.Entry>>> groupedSuggestion = new HashMap<>();
+        Map<String, List<Suggest.Suggestion>> groupedSuggestion = new HashMap<>();
         for (SearchPhaseResult entry : results.asList()) {
-            for (Suggest.Suggestion<?> suggestion : entry.queryResult().suggest()) {
-                List<Suggest.Suggestion<CompletionSuggestion.Entry>> suggests =
+            for (Suggest.Suggestion suggestion : entry.queryResult().suggest()) {
+                List<Suggest.Suggestion> suggests =
                     groupedSuggestion.computeIfAbsent(suggestion.getName(), s -> new ArrayList<>());
-                suggests.add((Suggest.Suggestion<CompletionSuggestion.Entry>) suggestion);
+                suggests.add(suggestion);
             }
         }
         return new Suggest(groupedSuggestion.values().stream().map(CompletionSuggestion::reduceTo)
@@ -265,7 +267,7 @@ public class SearchPhaseControllerTests extends ESTestCase {
                     }
                 }
             }
-            for (Suggest.Suggestion<?> suggestion : mergedSuggest) {
+            for (Suggest.Suggestion suggestion : mergedSuggest) {
                 if (suggestion instanceof CompletionSuggestion) {
                     for (CompletionSuggestion.Entry.Option option : ((CompletionSuggestion) suggestion).getOptions()) {
                         ScoreDoc doc = option.getDoc();

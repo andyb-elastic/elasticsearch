@@ -55,13 +55,12 @@ public class SuggestPhase extends AbstractComponent implements SearchPhase {
         }
         try {
             CharsRefBuilder spare = new CharsRefBuilder();
-            final List<Suggestion<? extends Entry<? extends Option>>> suggestions = new ArrayList<>(suggest.suggestions().size());
+            final List<Suggestion> suggestions = new ArrayList<>(suggest.suggestions().size());
 
             for (Map.Entry<String, SuggestionSearchContext.SuggestionContext> entry : suggest.suggestions().entrySet()) {
                 SuggestionSearchContext.SuggestionContext suggestion = entry.getValue();
                 Suggester<SuggestionContext> suggester = suggestion.getSuggester();
-                Suggestion<? extends Entry<? extends Option>> result =
-                    suggester.execute(entry.getKey(), suggestion, context.searcher(), spare);
+                Suggestion result = suggester.execute(entry.getKey(), suggestion, context.searcher(), spare);
                 if (result != null) {
                     assert entry.getKey().equals(result.name);
                     suggestions.add(result);

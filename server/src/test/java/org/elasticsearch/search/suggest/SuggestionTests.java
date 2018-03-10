@@ -53,11 +53,11 @@ import static org.elasticsearch.test.hamcrest.ElasticsearchAssertions.assertToXC
 public class SuggestionTests extends ESTestCase {
 
     @SuppressWarnings("unchecked")
-    private static final Class<Suggestion<? extends Entry<? extends Option>>>[] SUGGESTION_TYPES = new Class[] {
+    private static final Class<Suggestion>[] SUGGESTION_TYPES = new Class[] {
         TermSuggestion.class, PhraseSuggestion.class, CompletionSuggestion.class
     };
 
-    public static Suggestion<? extends Entry<? extends Option>> createTestItem() {
+    public static Suggestion createTestItem() {
         return createTestItem(randomFrom(SUGGESTION_TYPES));
     }
 
@@ -67,7 +67,7 @@ public class SuggestionTests extends ESTestCase {
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    public static Suggestion<? extends Entry<? extends Option>> createTestItem(Class<? extends Suggestion> type) {
+    public static Suggestion createTestItem(Class<? extends Suggestion> type) {
         String name = randomAlphaOfLengthBetween(5, 10);
         // note: size will not be rendered via "toXContent", only passed on internally on transport layer
         int size = randomInt();
@@ -112,7 +112,7 @@ public class SuggestionTests extends ESTestCase {
     @SuppressWarnings({ "rawtypes" })
     private void doTestFromXContent(boolean addRandomFields) throws IOException {
         ToXContent.Params params = new ToXContent.MapParams(Collections.singletonMap(RestSearchAction.TYPED_KEYS_PARAM, "true"));
-        for (Class<Suggestion<? extends Entry<? extends Option>>> type : SUGGESTION_TYPES) {
+        for (Class<Suggestion> type : SUGGESTION_TYPES) {
             Suggestion suggestion = createTestItem(type);
             XContentType xContentType = randomFrom(XContentType.values());
             boolean humanReadable = randomBoolean();
@@ -189,9 +189,9 @@ public class SuggestionTests extends ESTestCase {
         ToXContent.Params params = new ToXContent.MapParams(Collections.singletonMap(RestSearchAction.TYPED_KEYS_PARAM, "true"));
         {
             Option option = new Option(new Text("someText"), new Text("somethingHighlighted"), 1.3f, true);
-            Entry<Option> entry = new Entry<>(new Text("entryText"), 42, 313);
+            Entry entry = new Entry(new Text("entryText"), 42, 313);
             entry.addOption(option);
-            Suggestion<Entry<Option>> suggestion = new Suggestion<>("suggestionName", 5);
+            Suggestion suggestion = new Suggestion("suggestionName", 5);
             suggestion.addTerm(entry);
             BytesReference xContent = toXContent(suggestion, XContentType.JSON, params, randomBoolean());
             assertEquals(

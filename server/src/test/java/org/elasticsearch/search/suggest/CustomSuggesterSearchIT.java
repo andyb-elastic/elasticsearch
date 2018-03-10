@@ -94,8 +94,8 @@ public class CustomSuggesterSearchIT extends ESIntegTestCase {
 
         // TODO: infer type once JI-9019884 is fixed
         // TODO: see also JDK-8039214
-        List<Suggest.Suggestion.Entry<? extends Suggest.Suggestion.Entry.Option>> suggestions =
-            CollectionUtils.<Suggest.Suggestion.Entry<? extends Suggest.Suggestion.Entry.Option>>iterableAsArrayList(
+        List<Suggest.Suggestion.Entry> suggestions =
+            CollectionUtils.iterableAsArrayList(
                 searchResponse.getSuggest().getSuggestion("someName"));
         assertThat(suggestions, hasSize(2));
         assertThat(suggestions.get(0).getText().string(),

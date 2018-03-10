@@ -39,7 +39,7 @@ import static org.elasticsearch.common.xcontent.ConstructingObjectParser.constru
 /**
  * The suggestion responses corresponding with the suggestions in the request.
  */
-public class TermSuggestion extends Suggestion<TermSuggestion.Entry> {
+public class TermSuggestion extends Suggestion {
 
     public static final String NAME = "term";
 
@@ -147,7 +147,7 @@ public class TermSuggestion extends Suggestion<TermSuggestion.Entry> {
     /**
      * Represents a part from the suggest text with suggested options.
      */
-    public static class Entry extends org.elasticsearch.search.suggest.Suggest.Suggestion.Entry<TermSuggestion.Entry.Option> {
+    public static class Entry extends org.elasticsearch.search.suggest.Suggest.Suggestion.Entry {
 
         public Entry(Text text, int offset, int length) {
             super(text, offset, length);
