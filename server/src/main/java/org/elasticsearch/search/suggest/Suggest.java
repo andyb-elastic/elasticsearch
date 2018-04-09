@@ -24,6 +24,7 @@ import org.elasticsearch.common.CheckedFunction;
 import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.ParsingException;
 import org.elasticsearch.common.Strings;
+import org.elasticsearch.common.io.stream.NamedWriteable;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.io.stream.Streamable;
@@ -62,7 +63,7 @@ import static org.elasticsearch.common.xcontent.XContentParserUtils.ensureExpect
 /**
  * Top level suggest result, containing the result for each suggestion.
  */
-public class Suggest implements Iterable<Suggest.Suggestion>, Streamable, ToXContentFragment {
+public class Suggest implements Iterable<Suggest.Suggestion>, NamedWriteable, ToXContentFragment {
 
     public static final String NAME = "suggest";
 
@@ -81,6 +82,11 @@ public class Suggest implements Iterable<Suggest.Suggestion>, Streamable, ToXCon
 
     private Suggest() {
         this(Collections.emptyList());
+    }
+
+    public Suggest(StreamInput in) throws IOException {
+        suggestions = in.readNamedWriteableList(Suggestion.class);
+        hasScoreDocs = filter(CompletionSuggestion.class).stream().anyMatch(CompletionSuggestion::hasScoreDocs);
     }
 
     public Suggest(List<Suggestion> suggestions) {
@@ -126,38 +132,9 @@ public class Suggest implements Iterable<Suggest.Suggestion>, Streamable, ToXCon
     }
 
     @Override
-    public void readFrom(StreamInput in) throws IOException {
-        final int size = in.readVInt();
-        suggestions = new ArrayList<>(size);
-        for (int i = 0; i < size; i++) {
-            // TODO: remove these complicated generics
-            Suggestion suggestion;
-            final int type = in.readVInt();
-            switch (type) {
-            case TermSuggestion.TYPE:
-                suggestion = new TermSuggestion();
-                break;
-            case CompletionSuggestion.TYPE:
-                suggestion = new CompletionSuggestion();
-                break;
-            case 2: // CompletionSuggestion.TYPE
-                throw new IllegalArgumentException("Completion suggester 2.x is not supported anymore");
-            case PhraseSuggestion.TYPE:
-                suggestion = new PhraseSuggestion();
-                break;
-            default:
-                suggestion = new Suggestion();
-                break;
-            }
-            suggestion.readFrom(in);
-            suggestions.add(suggestion);
-        }
-        hasScoreDocs = filter(CompletionSuggestion.class).stream().anyMatch(CompletionSuggestion::hasScoreDocs);
-    }
-
-    @Override
     public void writeTo(StreamOutput out) throws IOException {
         out.writeVInt(suggestions.size());
+
         for (Suggestion command : suggestions) {
             out.writeVInt(command.getWriteableType());
             command.writeTo(out);
@@ -195,12 +172,6 @@ public class Suggest implements Iterable<Suggest.Suggestion>, Streamable, ToXCon
         return new Suggest(suggestions);
     }
 
-    public static Suggest readSuggest(StreamInput in) throws IOException {
-        Suggest result = new Suggest();
-        result.readFrom(in);
-        return result;
-    }
-
     public static List<Suggestion> reduce(Map<String, List<Suggest.Suggestion>> groupedSuggestions) {
         List<Suggestion> reduced = new ArrayList<>(groupedSuggestions.size());
         for (java.util.Map.Entry<String, List<Suggestion>> unmergedResults : groupedSuggestions.entrySet()) {
@@ -232,19 +203,30 @@ public class Suggest implements Iterable<Suggest.Suggestion>, Streamable, ToXCon
             .collect(Collectors.toList());
     }
 
+    @Override
+    public String getWriteableName() {
+        return "suggest";
+    }
+
     /**
      * The suggestion responses corresponding with the suggestions in the request.
      */
-    public static class Suggestion implements Iterable<Entry>, Streamable, ToXContentFragment {
+    public static class Suggestion implements Iterable<Entry>, NamedWriteable, ToXContentFragment {
 
         private static final String NAME = "suggestion";
 
         public static final int TYPE = 0;
         protected String name;
         protected int size;
-        protected final List<Entry> entries = new ArrayList<>(5);
+        protected List<Entry> entries = new ArrayList<>(5);
 
         protected Suggestion() {
+        }
+
+        public Suggestion(StreamInput in) throws IOException {
+            innerReadFrom(in);
+            int size = in.readVInt();
+            entries = in.readNamedWriteableList(Entry.class);
         }
 
         public Suggestion(String name, int size) {
@@ -346,18 +328,6 @@ public class Suggest implements Iterable<Suggest.Suggestion>, Streamable, ToXCon
             }
         }
 
-        @Override
-        public void readFrom(StreamInput in) throws IOException {
-            innerReadFrom(in);
-            int size = in.readVInt();
-            entries.clear();
-            for (int i = 0; i < size; i++) {
-                Entry newEntry = newEntry();
-                newEntry.readFrom(in);
-                entries.add(newEntry);
-            }
-        }
-
         protected Entry newEntry() {
             return new Entry();
         }
@@ -417,10 +387,15 @@ public class Suggest implements Iterable<Suggest.Suggestion>, Streamable, ToXCon
             }
         }
 
+        @Override
+        public String getWriteableName() {
+            return "suggestion";
+        }
+
         /**
          * Represents a part from the suggest text with suggested options.
          */
-        public static class Entry implements Iterable<Option>, Streamable, ToXContentObject {
+        public static class Entry implements Iterable<Option>, NamedWriteable, ToXContentObject {
 
             private static final String TEXT = "text";
             private static final String OFFSET = "offset";
@@ -440,6 +415,14 @@ public class Suggest implements Iterable<Suggest.Suggestion>, Streamable, ToXCon
             }
 
             protected Entry() {
+            }
+
+            public Entry(StreamInput in) throws IOException {
+                text = in.readText();
+                offset = in.readVInt();
+                length = in.readVInt();
+                options = in.readNamedWriteableList(Option.class);
+
             }
 
             public void addOption(Option option) {
@@ -557,20 +540,6 @@ public class Suggest implements Iterable<Suggest.Suggestion>, Streamable, ToXCon
                 return result;
             }
 
-            @Override
-            public void readFrom(StreamInput in) throws IOException {
-                text = in.readText();
-                offset = in.readVInt();
-                length = in.readVInt();
-                int suggestedWords = in.readVInt();
-                options = new ArrayList<>(suggestedWords);
-                for (int j = 0; j < suggestedWords; j++) {
-                    Option newOption = newOption();
-                    newOption.readFrom(in);
-                    options.add(newOption);
-                }
-            }
-
             protected Option newOption(){
                 return new Option();
             }
@@ -580,10 +549,7 @@ public class Suggest implements Iterable<Suggest.Suggestion>, Streamable, ToXCon
                 out.writeText(text);
                 out.writeVInt(offset);
                 out.writeVInt(length);
-                out.writeVInt(options.size());
-                for (Option option : options) {
-                    option.writeTo(out);
-                }
+                out.writeNamedWriteableList(options);
             }
 
             @Override
@@ -618,10 +584,15 @@ public class Suggest implements Iterable<Suggest.Suggestion>, Streamable, ToXCon
                 return PARSER.apply(parser, null);
             }
 
+            @Override
+            public String getWriteableName() {
+                return "suggestion-entry";
+            }
+
             /**
              * Contains the suggested text with its document frequency and score.
              */
-            public static class Option implements Streamable, ToXContentObject {
+            public static class Option implements NamedWriteable, ToXContentObject {
 
                 public static final ParseField TEXT = new ParseField("text");
                 public static final ParseField HIGHLIGHTED = new ParseField("highlighted");
@@ -649,6 +620,13 @@ public class Suggest implements Iterable<Suggest.Suggestion>, Streamable, ToXCon
                 }
 
                 public Option() {
+                }
+
+                public Option(StreamInput in) throws IOException {
+                    text = in.readText();
+                    score = in.readFloat();
+                    highlighted = in.readOptionalText();
+                    collateMatch = in.readOptionalBoolean();
                 }
 
                 /**
@@ -683,14 +661,6 @@ public class Suggest implements Iterable<Suggest.Suggestion>, Streamable, ToXCon
 
                 protected void setScore(float score) {
                     this.score = score;
-                }
-
-                @Override
-                public void readFrom(StreamInput in) throws IOException {
-                    text = in.readText();
-                    score = in.readFloat();
-                    highlighted = in.readOptionalText();
-                    collateMatch = in.readOptionalBoolean();
                 }
 
                 @Override
@@ -758,6 +728,11 @@ public class Suggest implements Iterable<Suggest.Suggestion>, Streamable, ToXCon
                 @Override
                 public int hashCode() {
                     return text.hashCode();
+                }
+
+                @Override
+                public String getWriteableName() {
+                    return "suggestion-entry-option";
                 }
             }
         }

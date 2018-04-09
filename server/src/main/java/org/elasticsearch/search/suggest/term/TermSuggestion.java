@@ -186,6 +186,11 @@ public class TermSuggestion extends Suggestion {
                 this.freq = freq;
             }
 
+            public Option(StreamInput in) throws IOException {
+                super(in);
+                freq = in.readVInt();
+            }
+
             @Override
             protected void mergeInto(Suggestion.Entry.Option otherOption) {
                 super.mergeInto(otherOption);
@@ -205,12 +210,6 @@ public class TermSuggestion extends Suggestion {
              */
             public int getFreq() {
                 return freq;
-            }
-
-            @Override
-            public void readFrom(StreamInput in) throws IOException {
-                super.readFrom(in);
-                freq = in.readVInt();
             }
 
             @Override

@@ -78,6 +78,11 @@ public class PhraseSuggestion extends Suggest.Suggestion {
         Entry() {
         }
 
+        public Entry(StreamInput in) throws IOException {
+            super(in);
+            cutoffScore = in.readDouble();
+        }
+
         /**
          * @return cutoff score for suggestions.  input term score * confidence for phrase suggest, 0 otherwise
          */
@@ -115,12 +120,6 @@ public class PhraseSuggestion extends Suggest.Suggestion {
 
         public static Entry fromXContent(XContentParser parser) {
             return PARSER.apply(parser, null);
-        }
-
-        @Override
-        public void readFrom(StreamInput in) throws IOException {
-            super.readFrom(in);
-            cutoffScore = in.readDouble();
         }
 
         @Override

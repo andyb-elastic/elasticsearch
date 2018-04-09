@@ -77,6 +77,13 @@ public final class CompletionSuggestion extends Suggest.Suggestion {
     public CompletionSuggestion() {
     }
 
+    public CompletionSuggestion(StreamInput in) throws IOException {
+        super(in);
+        if (in.getVersion().onOrAfter(Version.V_6_1_0)) {
+            skipDuplicates = in.readBoolean();
+        }
+    }
+
     /**
      * Ctr
      * @param name The name for the suggestions
@@ -86,14 +93,6 @@ public final class CompletionSuggestion extends Suggest.Suggestion {
     public CompletionSuggestion(String name, int size, boolean skipDuplicates) {
         super(name, size);
         this.skipDuplicates = skipDuplicates;
-    }
-
-    @Override
-    public void readFrom(StreamInput in) throws IOException {
-        super.readFrom(in);
-        if (in.getVersion().onOrAfter(Version.V_6_1_0)) {
-            skipDuplicates = in.readBoolean();
-        }
     }
 
     @Override
@@ -287,6 +286,25 @@ public final class CompletionSuggestion extends Suggest.Suggestion {
                 this.contexts = Objects.requireNonNull(contexts, "context map cannot be null");
             }
 
+            public Option(StreamInput in) throws IOException {
+                super(in);
+                this.doc = Lucene.readScoreDoc(in);
+                if (in.readBoolean()) {
+                    this.hit = SearchHit.readSearchHit(in);
+                }
+                int contextSize = in.readInt();
+                this.contexts = new LinkedHashMap<>(contextSize);
+                for (int i = 0; i < contextSize; i++) {
+                    String contextName = in.readString();
+                    int nContexts = in.readVInt();
+                    Set<CharSequence> contexts = new HashSet<>(nContexts);
+                    for (int j = 0; j < nContexts; j++) {
+                        contexts.add(in.readString());
+                    }
+                    this.contexts.put(contextName, contexts);
+                }
+            }
+
             protected Option() {
                 super();
             }
@@ -390,26 +408,6 @@ public final class CompletionSuggestion extends Suggest.Suggestion {
                 CompletionSuggestion.Entry.Option option = new CompletionSuggestion.Entry.Option(-1, text, score, contexts);
                 option.setHit(hit);
                 return option;
-            }
-
-            @Override
-            public void readFrom(StreamInput in) throws IOException {
-                super.readFrom(in);
-                this.doc = Lucene.readScoreDoc(in);
-                if (in.readBoolean()) {
-                    this.hit = SearchHit.readSearchHit(in);
-                }
-                int contextSize = in.readInt();
-                this.contexts = new LinkedHashMap<>(contextSize);
-                for (int i = 0; i < contextSize; i++) {
-                    String contextName = in.readString();
-                    int nContexts = in.readVInt();
-                    Set<CharSequence> contexts = new HashSet<>(nContexts);
-                    for (int j = 0; j < nContexts; j++) {
-                        contexts.add(in.readString());
-                    }
-                    this.contexts.put(contextName, contexts);
-                }
             }
 
             @Override
