@@ -459,7 +459,7 @@ class VagrantTestPlugin implements Plugin<Project> {
 
             if (box in LINUX_BOXES) {
                 javaPackagingTest.command = 'ssh'
-                javaPackagingTest.args = ['--command', "cd \$PACKAGING_TESTS && ./run-tests.sh"]
+                javaPackagingTest.args = ['--command', "cd \$PACKAGING_TESTS && sudo ./run-tests.sh"]
             } else {
                 javaPackagingTest.command = 'winrm'
                 javaPackagingTest.args = ['--command', 'cd \$Env:PACKAGING_TESTS; ./run-tests.ps1']

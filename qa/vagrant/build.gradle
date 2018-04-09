@@ -29,8 +29,10 @@ plugins {
 dependencies {
   compile "junit:junit:${versions.junit}"
   compile "org.hamcrest:hamcrest-core:${versions.hamcrest}"
+  compile "org.hamcrest:hamcrest-library:${versions.hamcrest}"
 
-  // needs to be on the classpath for JarHell but not actually needed for tests
+  compile project(':qa:vagrant:common')
+
   runtime project(':libs:elasticsearch-core')
 
   // pulls in the jar built by this project and its dependencies

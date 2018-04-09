@@ -17,16 +17,30 @@
  * under the License.
  */
 
-package org.elasticsearch.packaging;
+import org.elasticsearch.gradle.precommit.PrecommitTasks
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+plugins {
+    id 'java'
+    id 'elasticsearch.build'
+}
 
-/**
- * This class doesn't have any tests yet
- */
-@RunWith(Suite.class)
-@Suite.SuiteClasses({
-    TarArchiveTests.class
-})
-public class PackagingTests {}
+dependencies {
+    compile "junit:junit:${versions.junit}"
+    compile "org.hamcrest:hamcrest-core:${versions.hamcrest}"
+    compile "org.hamcrest:hamcrest-library:${versions.hamcrest}"
+
+    compile project(':libs:elasticsearch-core')
+}
+
+forbiddenApisMain {
+    signaturesURLs = [
+        PrecommitTasks.getResource('/forbidden/jdk-signatures.txt')
+    ]
+}
+
+// we don't have additional tests for the tests themselves
+tasks.test.enabled = false
+
+// this project doesn't get published
+tasks.dependencyLicenses.enabled = false
+tasks.dependenciesInfo.enabled = false
