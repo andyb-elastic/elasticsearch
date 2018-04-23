@@ -27,7 +27,6 @@ import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.io.stream.NamedWriteable;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
-import org.elasticsearch.common.io.stream.Streamable;
 import org.elasticsearch.common.text.Text;
 import org.elasticsearch.common.xcontent.ConstructingObjectParser;
 import org.elasticsearch.common.xcontent.ObjectParser;
@@ -42,8 +41,6 @@ import org.elasticsearch.search.aggregations.Aggregation;
 import org.elasticsearch.search.suggest.Suggest.Suggestion.Entry;
 import org.elasticsearch.search.suggest.Suggest.Suggestion.Entry.Option;
 import org.elasticsearch.search.suggest.completion.CompletionSuggestion;
-import org.elasticsearch.search.suggest.phrase.PhraseSuggestion;
-import org.elasticsearch.search.suggest.term.TermSuggestion;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -66,6 +63,8 @@ import static org.elasticsearch.common.xcontent.XContentParserUtils.ensureExpect
 public class Suggest implements Iterable<Suggest.Suggestion>, NamedWriteable, ToXContentFragment {
 
     public static final String NAME = "suggest";
+
+    public static final String WRITEABLE_NAME = "suggest";
 
     public static final Comparator<Option> COMPARATOR = (first, second) -> {
         int cmp = Float.compare(second.getScore(), first.getScore());
@@ -99,6 +98,16 @@ public class Suggest implements Iterable<Suggest.Suggestion>, NamedWriteable, To
     }
 
     @Override
+    public void writeTo(StreamOutput out) throws IOException {
+        out.writeNamedWriteableList(suggestions);
+    }
+
+    @Override
+    public String getWriteableName() {
+        return WRITEABLE_NAME;
+    }
+
+    @Override
     public Iterator<Suggestion> iterator() {
         return suggestions.iterator();
     }
@@ -129,16 +138,6 @@ public class Suggest implements Iterable<Suggest.Suggestion>, NamedWriteable, To
      */
     public boolean hasScoreDocs() {
         return hasScoreDocs;
-    }
-
-    @Override
-    public void writeTo(StreamOutput out) throws IOException {
-        out.writeVInt(suggestions.size());
-
-        for (Suggestion command : suggestions) {
-            out.writeVInt(command.getWriteableType());
-            command.writeTo(out);
-        }
     }
 
     @Override
@@ -203,11 +202,6 @@ public class Suggest implements Iterable<Suggest.Suggestion>, NamedWriteable, To
             .collect(Collectors.toList());
     }
 
-    @Override
-    public String getWriteableName() {
-        return "suggest";
-    }
-
     /**
      * The suggestion responses corresponding with the suggestions in the request.
      */
@@ -215,7 +209,8 @@ public class Suggest implements Iterable<Suggest.Suggestion>, NamedWriteable, To
 
         private static final String NAME = "suggestion";
 
-        public static final int TYPE = 0;
+        public static final String WRITEABLE_NAME = "suggestion";
+
         protected String name;
         protected int size;
         protected List<Entry> entries = new ArrayList<>(5);
@@ -224,8 +219,8 @@ public class Suggest implements Iterable<Suggest.Suggestion>, NamedWriteable, To
         }
 
         public Suggestion(StreamInput in) throws IOException {
-            innerReadFrom(in);
-            int size = in.readVInt();
+            name = in.readString();
+            size = in.readVInt();
             entries = in.readNamedWriteableList(Entry.class);
         }
 
@@ -234,16 +229,13 @@ public class Suggest implements Iterable<Suggest.Suggestion>, NamedWriteable, To
             this.size = size; // The suggested term size specified in request, only used for merging shard responses
         }
 
-        public void addTerm(Entry entry) {
-            entries.add(entry);
+        @Override
+        public String getWriteableName() {
+            return WRITEABLE_NAME;
         }
 
-        /**
-         * Returns a integer representing the type of the suggestion. This is used for
-         * internal serialization over the network.
-         */
-        public int getWriteableType() { // TODO remove this in favor of NamedWriteable
-            return TYPE;
+        public void addTerm(Entry entry) {
+            entries.add(entry);
         }
 
         /**
@@ -332,24 +324,11 @@ public class Suggest implements Iterable<Suggest.Suggestion>, NamedWriteable, To
             return new Entry();
         }
 
-
-        protected void innerReadFrom(StreamInput in) throws IOException {
-            name = in.readString();
-            size = in.readVInt();
-        }
-
         @Override
         public void writeTo(StreamOutput out) throws IOException {
-            innerWriteTo(out);
-            out.writeVInt(entries.size());
-            for (Entry entry : entries) {
-                entry.writeTo(out);
-            }
-        }
-
-        public void innerWriteTo(StreamOutput out) throws IOException {
             out.writeString(name);
             out.writeVInt(size);
+            out.writeNamedWriteableList(entries);
         }
 
         @Override
@@ -387,15 +366,12 @@ public class Suggest implements Iterable<Suggest.Suggestion>, NamedWriteable, To
             }
         }
 
-        @Override
-        public String getWriteableName() {
-            return "suggestion";
-        }
-
         /**
          * Represents a part from the suggest text with suggested options.
          */
         public static class Entry implements Iterable<Option>, NamedWriteable, ToXContentObject {
+
+            public static final String WRITEABLE_NAME = "suggestion-entry";
 
             private static final String TEXT = "text";
             private static final String OFFSET = "offset";
@@ -422,7 +398,19 @@ public class Suggest implements Iterable<Suggest.Suggestion>, NamedWriteable, To
                 offset = in.readVInt();
                 length = in.readVInt();
                 options = in.readNamedWriteableList(Option.class);
+            }
 
+            @Override
+            public void writeTo(StreamOutput out) throws IOException {
+                out.writeText(text);
+                out.writeVInt(offset);
+                out.writeVInt(length);
+                out.writeNamedWriteableList(options);
+            }
+
+            @Override
+            public String getWriteableName() {
+                return WRITEABLE_NAME;
             }
 
             public void addOption(Option option) {
@@ -545,14 +533,6 @@ public class Suggest implements Iterable<Suggest.Suggestion>, NamedWriteable, To
             }
 
             @Override
-            public void writeTo(StreamOutput out) throws IOException {
-                out.writeText(text);
-                out.writeVInt(offset);
-                out.writeVInt(length);
-                out.writeNamedWriteableList(options);
-            }
-
-            @Override
             public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
                 builder.startObject();
                 builder.field(TEXT, text);
@@ -584,15 +564,12 @@ public class Suggest implements Iterable<Suggest.Suggestion>, NamedWriteable, To
                 return PARSER.apply(parser, null);
             }
 
-            @Override
-            public String getWriteableName() {
-                return "suggestion-entry";
-            }
-
             /**
              * Contains the suggested text with its document frequency and score.
              */
             public static class Option implements NamedWriteable, ToXContentObject {
+
+                public static final String WRITEABLE_NAME = "suggestion_entry_option";
 
                 public static final ParseField TEXT = new ParseField("text");
                 public static final ParseField HIGHLIGHTED = new ParseField("highlighted");
@@ -627,6 +604,11 @@ public class Suggest implements Iterable<Suggest.Suggestion>, NamedWriteable, To
                     score = in.readFloat();
                     highlighted = in.readOptionalText();
                     collateMatch = in.readOptionalBoolean();
+                }
+
+                @Override
+                public String getWriteableName() {
+                    return WRITEABLE_NAME;
                 }
 
                 /**
@@ -728,11 +710,6 @@ public class Suggest implements Iterable<Suggest.Suggestion>, NamedWriteable, To
                 @Override
                 public int hashCode() {
                     return text.hashCode();
-                }
-
-                @Override
-                public String getWriteableName() {
-                    return "suggestion-entry-option";
                 }
             }
         }

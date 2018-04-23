@@ -21,6 +21,7 @@ package org.elasticsearch.search;
 
 import org.apache.lucene.search.BooleanQuery;
 import org.elasticsearch.common.NamedRegistry;
+import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.geo.GeoShapeType;
 import org.elasticsearch.common.geo.ShapesAvailability;
 import org.elasticsearch.common.io.stream.NamedWriteableRegistry;
@@ -242,13 +243,17 @@ import org.elasticsearch.search.sort.GeoDistanceSortBuilder;
 import org.elasticsearch.search.sort.ScoreSortBuilder;
 import org.elasticsearch.search.sort.ScriptSortBuilder;
 import org.elasticsearch.search.sort.SortBuilder;
+import org.elasticsearch.search.suggest.Suggest;
 import org.elasticsearch.search.suggest.SuggestionBuilder;
+import org.elasticsearch.search.suggest.completion.CompletionSuggestion;
 import org.elasticsearch.search.suggest.completion.CompletionSuggestionBuilder;
 import org.elasticsearch.search.suggest.phrase.Laplace;
 import org.elasticsearch.search.suggest.phrase.LinearInterpolation;
+import org.elasticsearch.search.suggest.phrase.PhraseSuggestion;
 import org.elasticsearch.search.suggest.phrase.PhraseSuggestionBuilder;
 import org.elasticsearch.search.suggest.phrase.SmoothingModel;
 import org.elasticsearch.search.suggest.phrase.StupidBackoff;
+import org.elasticsearch.search.suggest.term.TermSuggestion;
 import org.elasticsearch.search.suggest.term.TermSuggestionBuilder;
 
 import java.util.ArrayList;
@@ -577,11 +582,38 @@ public class SearchModule {
     private void registerSuggesters(List<SearchPlugin> plugins) {
         registerSmoothingModels(namedWriteables);
 
-        registerSuggester(new SuggesterSpec<>("term", TermSuggestionBuilder::new, TermSuggestionBuilder::fromXContent));
-        registerSuggester(new SuggesterSpec<>("phrase", PhraseSuggestionBuilder::new, PhraseSuggestionBuilder::fromXContent));
-        registerSuggester(new SuggesterSpec<>("completion", CompletionSuggestionBuilder::new, CompletionSuggestionBuilder::fromXContent));
+        registerSuggester(
+            new SuggesterSpec<>("term", TermSuggestionBuilder::new, TermSuggestionBuilder::fromXContent)
+                .addSuggestionReader(TermSuggestion.WRITEABLE_NAME, TermSuggestion::new)
+                .addEntryReader(TermSuggestion.Entry.WRITEABLE_NAME, TermSuggestion.Entry::new)
+                .addOptionReader(TermSuggestion.Entry.Option.WRITEABLE_NAME, TermSuggestion.Entry.Option::new));
+
+        registerSuggester(
+            new SuggesterSpec<>("phrase", PhraseSuggestionBuilder::new, PhraseSuggestionBuilder::fromXContent)
+                .addSuggestionReader(PhraseSuggestion.WRITEABLE_NAME, PhraseSuggestion::new)
+                .addEntryReader(PhraseSuggestion.Entry.WRITEABLE_NAME, PhraseSuggestion.Entry::new)
+                .addOptionReader(Suggest.Suggestion.Entry.Option.WRITEABLE_NAME, Suggest.Suggestion.Entry.Option::new)); // this one doesn't have an option subclass
+
+        registerSuggester(
+            new SuggesterSpec<>("completion", CompletionSuggestionBuilder::new, CompletionSuggestionBuilder::fromXContent)
+                .addSuggestionReader(CompletionSuggestion.WRITEABLE_NAME, CompletionSuggestion::new)
+                .addEntryReader(CompletionSuggestion.Entry.WRITEABLE_NAME, CompletionSuggestion.Entry::new)
+                .addOptionReader(CompletionSuggestion.Entry.Option.WRITEABLE_NAME, CompletionSuggestion.Entry.Option::new));
 
         registerFromPlugin(plugins, SearchPlugin::getSuggesters, this::registerSuggester);
+
+        namedWriteables.add(new NamedWriteableRegistry.Entry(Suggest.class, Suggest.WRITEABLE_NAME, Suggest::new));
+        namedXContents.add(new NamedXContentRegistry.Entry(Suggest.class, new ParseField(Suggest.WRITEABLE_NAME), Suggest::fromXContent));
+
+        namedWriteables.add(new NamedWriteableRegistry.Entry(Suggest.Suggestion.class, Suggest.Suggestion.WRITEABLE_NAME,
+            Suggest.Suggestion::new));
+        namedXContents.add(new NamedXContentRegistry.Entry(Suggest.Suggestion.class, new ParseField(Suggest.Suggestion.WRITEABLE_NAME),
+            Suggest.Suggestion::fromXContent));
+
+        namedWriteables.add(new NamedWriteableRegistry.Entry(Suggest.Suggestion.Entry.class, Suggest.Suggestion.Entry.WRITEABLE_NAME,
+            Suggest.Suggestion.Entry::new));
+        namedXContents.add(new NamedXContentRegistry.Entry(Suggest.Suggestion.Entry.class, new ParseField(Suggest.Suggestion.Entry.WRITEABLE_NAME),
+            Suggest.Suggestion.Entry::fromXContent));
     }
 
     private void registerSuggester(SuggesterSpec<?> suggester) {
@@ -589,6 +621,24 @@ public class SearchModule {
                 SuggestionBuilder.class, suggester.getName().getPreferredName(), suggester.getReader()));
         namedXContents.add(new NamedXContentRegistry.Entry(SuggestionBuilder.class, suggester.getName(),
                 suggester.getParser()));
+
+        for (Map.Entry<String, Writeable.Reader<? extends Suggest.Suggestion>> entry : suggester.getSuggestionReaders().entrySet()) {
+            String writeableName = entry.getKey();
+            Writeable.Reader<? extends Suggest.Suggestion> suggestionReader = entry.getValue();
+            namedWriteables.add(new NamedWriteableRegistry.Entry(Suggest.Suggestion.class, writeableName, suggestionReader));
+        }
+
+        for (Map.Entry<String, Writeable.Reader<? extends Suggest.Suggestion.Entry>> entry : suggester.getEntryReaders().entrySet()) {
+            String writeableName = entry.getKey();
+            Writeable.Reader<? extends Suggest.Suggestion.Entry> entryReader = entry.getValue();
+            namedWriteables.add(new NamedWriteableRegistry.Entry(Suggest.Suggestion.Entry.class, writeableName, entryReader));
+        }
+
+        for (Map.Entry<String, Writeable.Reader<? extends Suggest.Suggestion.Entry.Option>> entry : suggester.getOptionReaders().entrySet()) {
+            String writeableName = entry.getKey();
+            Writeable.Reader<? extends Suggest.Suggestion.Entry.Option> optionReader = entry.getValue();
+            namedWriteables.add(new NamedWriteableRegistry.Entry(Suggest.Suggestion.Entry.Option.class, writeableName, optionReader));
+        }
     }
 
     private Map<String, Highlighter> setupHighlighters(Settings settings, List<SearchPlugin> plugins) {

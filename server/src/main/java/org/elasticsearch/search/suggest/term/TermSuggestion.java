@@ -41,20 +41,35 @@ import static org.elasticsearch.common.xcontent.ConstructingObjectParser.constru
  */
 public class TermSuggestion extends Suggestion {
 
-    public static final String NAME = "term";
-
     public static final Comparator<Suggestion.Entry.Option> SCORE = new Score();
     public static final Comparator<Suggestion.Entry.Option> FREQUENCY = new Frequency();
-    public static final int TYPE = 1;
+
+    public static final String WRITEABLE_NAME = "term_suggestion";
 
     private SortBy sort;
 
     public TermSuggestion() {
     }
 
+    public TermSuggestion(StreamInput in) throws IOException {
+        super(in);
+        sort = SortBy.readFromStream(in);
+    }
+
     public TermSuggestion(String name, int size, SortBy sort) {
         super(name, size);
         this.sort = sort;
+    }
+
+    @Override
+    public void writeTo(StreamOutput out) throws IOException {
+        super.writeTo(out);
+        sort.writeTo(out);
+    }
+
+    @Override
+    public String getWriteableName() {
+        return WRITEABLE_NAME;
     }
 
     // Same behaviour as comparators in suggest module, but for SuggestedWord
@@ -99,16 +114,6 @@ public class TermSuggestion extends Suggestion {
     }
 
     @Override
-    public int getWriteableType() {
-        return TYPE;
-    }
-
-    @Override
-    protected String getType() {
-        return NAME;
-    }
-
-    @Override
     protected Comparator<Option> sortComparator() {
         switch (sort) {
         case SCORE:
@@ -118,18 +123,6 @@ public class TermSuggestion extends Suggestion {
         default:
             throw new ElasticsearchException("Could not resolve comparator for sort key: [" + sort + "]");
         }
-    }
-
-    @Override
-    protected void innerReadFrom(StreamInput in) throws IOException {
-        super.innerReadFrom(in);
-        sort = SortBy.readFromStream(in);
-    }
-
-    @Override
-    public void innerWriteTo(StreamOutput out) throws IOException {
-        super.innerWriteTo(out);
-        sort.writeTo(out);
     }
 
     public static TermSuggestion fromXContent(XContentParser parser, String name) throws IOException {
@@ -149,11 +142,23 @@ public class TermSuggestion extends Suggestion {
      */
     public static class Entry extends org.elasticsearch.search.suggest.Suggest.Suggestion.Entry {
 
+        public static final String WRITEABLE_NAME = "term_entry";
+
         public Entry(Text text, int offset, int length) {
             super(text, offset, length);
         }
 
+        // hack so we can use this as a reader when registering this type of NamedWriteable
+        public Entry(StreamInput in) throws IOException {
+            super(in);
+        }
+
         Entry() {
+        }
+
+        @Override
+        public String getWriteableName() {
+            return WRITEABLE_NAME;
         }
 
         @Override
@@ -179,6 +184,8 @@ public class TermSuggestion extends Suggestion {
 
             public static final ParseField FREQ = new ParseField("freq");
 
+            public static final String WRITEABLE_NAME = "term_option";
+
             private int freq;
 
             public Option(Text text, int freq, float score) {
@@ -189,6 +196,17 @@ public class TermSuggestion extends Suggestion {
             public Option(StreamInput in) throws IOException {
                 super(in);
                 freq = in.readVInt();
+            }
+
+            @Override
+            public void writeTo(StreamOutput out) throws IOException {
+                super.writeTo(out);
+                out.writeVInt(freq);
+            }
+
+            @Override
+            public String getWriteableName() {
+                return WRITEABLE_NAME;
             }
 
             @Override
@@ -210,12 +228,6 @@ public class TermSuggestion extends Suggestion {
              */
             public int getFreq() {
                 return freq;
-            }
-
-            @Override
-            public void writeTo(StreamOutput out) throws IOException {
-                super.writeTo(out);
-                out.writeVInt(freq);
             }
 
             @Override

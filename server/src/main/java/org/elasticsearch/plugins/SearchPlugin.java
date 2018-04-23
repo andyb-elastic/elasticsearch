@@ -50,6 +50,7 @@ import org.elasticsearch.search.fetch.FetchSubPhase;
 import org.elasticsearch.search.fetch.subphase.highlight.Highlighter;
 import org.elasticsearch.search.rescore.RescorerBuilder;
 import org.elasticsearch.search.rescore.Rescorer;
+import org.elasticsearch.search.suggest.Suggest;
 import org.elasticsearch.search.suggest.Suggester;
 import org.elasticsearch.search.suggest.SuggestionBuilder;
 
@@ -151,6 +152,10 @@ public interface SearchPlugin {
      * Specification for a {@link Suggester}.
      */
     class SuggesterSpec<T extends SuggestionBuilder<T>> extends SearchExtensionSpec<T, CheckedFunction<XContentParser, T, IOException>> {
+        private Map<String, Writeable.Reader<? extends Suggest.Suggestion>> suggestionReaders = new TreeMap<>();
+        private Map<String, Writeable.Reader<? extends Suggest.Suggestion.Entry>> entryReaders = new TreeMap<>();
+        private Map<String, Writeable.Reader<? extends Suggest.Suggestion.Entry.Option>> optionReaders = new TreeMap<>();
+
         /**
          * Specification of custom {@link Suggester}.
          *
@@ -176,6 +181,33 @@ public interface SearchPlugin {
          */
         public SuggesterSpec(String name, Writeable.Reader<T> reader, CheckedFunction<XContentParser, T, IOException> parser) {
             super(name, reader, parser);
+        }
+
+        public SuggesterSpec addSuggestionReader(String writeableName, Writeable.Reader<? extends Suggest.Suggestion> suggestionReader) {
+            suggestionReaders.put(writeableName, suggestionReader);
+            return this;
+        }
+
+        public Map<String, Writeable.Reader<? extends Suggest.Suggestion>> getSuggestionReaders() {
+            return suggestionReaders;
+        }
+
+        public SuggesterSpec addEntryReader(String writeableName, Writeable.Reader<? extends Suggest.Suggestion.Entry> entryReader) {
+            entryReaders.put(writeableName, entryReader);
+            return this;
+        }
+
+        public Map<String, Writeable.Reader<? extends Suggest.Suggestion.Entry>> getEntryReaders() {
+            return entryReaders;
+        }
+
+        public SuggesterSpec addOptionReader(String writeableName, Writeable.Reader<? extends Suggest.Suggestion.Entry.Option> optionReader) {
+            optionReaders.put(writeableName, optionReader);
+            return this;
+        }
+
+        public Map<String, Writeable.Reader<? extends Suggest.Suggestion.Entry.Option>> getOptionReaders() {
+            return optionReaders;
         }
     }
 

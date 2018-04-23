@@ -35,10 +35,11 @@ import java.io.IOException;
  */
 public class PhraseSuggestion extends Suggest.Suggestion {
 
-    public static final String NAME = "phrase";
-    public static final int TYPE = 3;
+    public static final String WRITEABLE_NAME = "phrase_suggestion";
 
-    public PhraseSuggestion() {
+    // hack so we can use this as a reader when registering this type of NamedWriteable
+    public PhraseSuggestion(StreamInput in) throws IOException {
+        super(in);
     }
 
     public PhraseSuggestion(String name, int size) {
@@ -46,13 +47,8 @@ public class PhraseSuggestion extends Suggest.Suggestion {
     }
 
     @Override
-    public int getWriteableType() {
-        return TYPE;
-    }
-
-    @Override
-    protected String getType() {
-        return NAME;
+    public String getWriteableName() {
+        return WRITEABLE_NAME;
     }
 
     @Override
@@ -68,6 +64,8 @@ public class PhraseSuggestion extends Suggest.Suggestion {
 
     public static class Entry extends Suggestion.Entry {
 
+        public static final String WRITEABLE_NAME = "phrase_entry";
+
         protected double cutoffScore = Double.MIN_VALUE;
 
         public Entry(Text text, int offset, int length, double cutoffScore) {
@@ -81,6 +79,11 @@ public class PhraseSuggestion extends Suggest.Suggestion {
         public Entry(StreamInput in) throws IOException {
             super(in);
             cutoffScore = in.readDouble();
+        }
+
+        @Override
+        public String getWriteableName() {
+            return WRITEABLE_NAME;
         }
 
         /**

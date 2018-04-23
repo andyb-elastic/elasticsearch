@@ -68,9 +68,7 @@ import static org.elasticsearch.search.suggest.Suggest.COMPARATOR;
  */
 public final class CompletionSuggestion extends Suggest.Suggestion {
 
-    public static final String NAME = "completion";
-
-    public static final int TYPE = 4;
+    public static final String WRITEABLE_NAME = "completion_suggestion";
 
     private boolean skipDuplicates;
 
@@ -93,6 +91,11 @@ public final class CompletionSuggestion extends Suggest.Suggestion {
     public CompletionSuggestion(String name, int size, boolean skipDuplicates) {
         super(name, size);
         this.skipDuplicates = skipDuplicates;
+    }
+
+    @Override
+    public String getWriteableName() {
+        return WRITEABLE_NAME;
     }
 
     @Override
@@ -233,27 +236,29 @@ public final class CompletionSuggestion extends Suggest.Suggestion {
     }
 
     @Override
-    public int getWriteableType() {
-        return TYPE;
-    }
-
-    @Override
-    protected String getType() {
-        return NAME;
-    }
-
-    @Override
     protected Entry newEntry() {
         return new Entry();
     }
 
     public static final class Entry extends Suggest.Suggestion.Entry {
 
+        public static final String WRITEABLE_NAME = "completion_entry";
+
         public Entry(Text text, int offset, int length) {
             super(text, offset, length);
         }
 
+        // hack so we can use this as a reader when registering this type of NamedWriteable
+        public Entry(StreamInput in) throws IOException {
+            super(in);
+        }
+
         Entry() {
+        }
+
+        @Override
+        public String getWriteableName() {
+            return WRITEABLE_NAME;
         }
 
         @Override
@@ -274,6 +279,8 @@ public final class CompletionSuggestion extends Suggest.Suggestion {
         }
 
         public static class Option extends Suggest.Suggestion.Entry.Option {
+            public static final String WRITEABLE_NAME = "completion_option";
+
             private Map<String, Set<CharSequence>> contexts = Collections.emptyMap();
             private ScoreDoc doc;
             private SearchHit hit;
@@ -305,8 +312,33 @@ public final class CompletionSuggestion extends Suggest.Suggestion {
                 }
             }
 
+            @Override
+            public void writeTo(StreamOutput out) throws IOException {
+                super.writeTo(out);
+                Lucene.writeScoreDoc(out, doc);
+                if (hit != null) {
+                    out.writeBoolean(true);
+                    hit.writeTo(out);
+                } else {
+                    out.writeBoolean(false);
+                }
+                out.writeInt(contexts.size());
+                for (Map.Entry<String, Set<CharSequence>> entry : contexts.entrySet()) {
+                    out.writeString(entry.getKey());
+                    out.writeVInt(entry.getValue().size());
+                    for (CharSequence ctx : entry.getValue()) {
+                        out.writeString(ctx.toString());
+                    }
+                }
+            }
+
             protected Option() {
                 super();
+            }
+
+            @Override
+            public String getWriteableName() {
+                return WRITEABLE_NAME;
             }
 
             @Override
@@ -408,26 +440,6 @@ public final class CompletionSuggestion extends Suggest.Suggestion {
                 CompletionSuggestion.Entry.Option option = new CompletionSuggestion.Entry.Option(-1, text, score, contexts);
                 option.setHit(hit);
                 return option;
-            }
-
-            @Override
-            public void writeTo(StreamOutput out) throws IOException {
-                super.writeTo(out);
-                Lucene.writeScoreDoc(out, doc);
-                if (hit != null) {
-                    out.writeBoolean(true);
-                    hit.writeTo(out);
-                } else {
-                    out.writeBoolean(false);
-                }
-                out.writeInt(contexts.size());
-                for (Map.Entry<String, Set<CharSequence>> entry : contexts.entrySet()) {
-                    out.writeString(entry.getKey());
-                    out.writeVInt(entry.getValue().size());
-                    for (CharSequence ctx : entry.getValue()) {
-                        out.writeString(ctx.toString());
-                    }
-                }
             }
 
             @Override
