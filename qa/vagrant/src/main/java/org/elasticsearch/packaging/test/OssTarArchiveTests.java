@@ -17,18 +17,14 @@
  * under the License.
  */
 
-package org.elasticsearch.packaging;
+package org.elasticsearch.packaging.test;
 
-import org.elasticsearch.packaging.test.OssTarArchiveTests;
-import org.elasticsearch.packaging.test.TarArchiveTests;
+import org.elasticsearch.packaging.util.Distribution;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
-import org.junit.runners.Suite.SuiteClasses;
+public class OssTarArchiveTests extends ArchiveTestCase {
 
-@RunWith(Suite.class)
-@SuiteClasses({
-    TarArchiveTests.class,
-    OssTarArchiveTests.class
-})
-public class PackagingTests {}
+    @Override
+    protected Distribution distribution() {
+        return Distribution.OSS_TAR;
+    }
+}

@@ -237,6 +237,7 @@ def linux_common(config,
 
   config.vm.provision 'markerfile', type: 'shell', inline: <<-SHELL
     touch /etc/is_vagrant_vm
+    touch /is_vagrant_vm # for consistency between linux and windows
   SHELL
 
   # This prevents leftovers from previous tests using the
@@ -390,5 +391,10 @@ def windows_common(config, name)
     $ErrorActionPreference = "Stop"
     [Environment]::SetEnvironmentVariable("PACKAGING_ARCHIVES", "C:/project/build/packaging/archives", "Machine")
     [Environment]::SetEnvironmentVariable("PACKAGING_TESTS", "C:/project/build/packaging/tests", "Machine")
+  SHELL
+
+  config.vm.provision 'install 7zip', type: 'shell', inline: <<-SHELL
+    $ErrorActionPreference = "Stop"
+    choco install -y 7zip
   SHELL
 end

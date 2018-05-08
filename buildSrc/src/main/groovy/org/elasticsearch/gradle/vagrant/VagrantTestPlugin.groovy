@@ -225,13 +225,19 @@ class VagrantTestPlugin implements Plugin<Project> {
         Task createLinuxRunnerScript = project.tasks.create('createLinuxRunnerScript', FileContentsTask) {
             dependsOn copyPackagingTests
             file "${testsDir}/run-tests.sh"
-            contents "java -cp \"\$PACKAGING_TESTS/*\" org.junit.runner.JUnitCore ${-> project.extensions.esvagrant.testClass}"
+            contents """\
+                     test_class=\${1:-${-> project.extensions.esvagrant.testClass}}
+                     java -cp "\$PACKAGING_TESTS/*" org.elasticsearch.packaging.VMTestRunner "\$test_class"
+                     """
         }
         Task createWindowsRunnerScript = project.tasks.create('createWindowsRunnerScript', FileContentsTask) {
             dependsOn copyPackagingTests
             file "${testsDir}/run-tests.ps1"
             contents """\
-                     java -cp "\$Env:PACKAGING_TESTS/*" org.junit.runner.JUnitCore ${-> project.extensions.esvagrant.testClass}
+                     param (
+                       [string]\$test_class = "${-> project.extensions.esvagrant.testClass}"
+                     )
+                     java -cp "\$Env:PACKAGING_TESTS/*" org.elasticsearch.packaging.VMTestRunner "\$test_class"
                      exit \$LASTEXITCODE
                      """
         }
@@ -492,9 +498,10 @@ class VagrantTestPlugin implements Plugin<Project> {
 
             if (box in LINUX_BOXES) {
                 javaPackagingTest.command = 'ssh'
-                javaPackagingTest.args = ['--command', 'bash "$PACKAGING_TESTS/run-tests.sh"']
+                javaPackagingTest.args = ['--command', 'sudo bash "$PACKAGING_TESTS/run-tests.sh"']
             } else {
                 javaPackagingTest.command = 'winrm'
+                // winrm commands run as administrator
                 javaPackagingTest.args = ['--command', 'powershell -File "$Env:PACKAGING_TESTS/run-tests.ps1"']
             }
 
