@@ -101,3 +101,10 @@ integTestCluster {
     return tmpFile.exists()
   }
 }
+
+Task basicLicenseClusterTest = tasks.create(name: 'basicLicenseClusterTest', type: RestIntegTestTask) {
+  description = 'Runs integration tests against a cluster with a basic license'
+  group = JavaBasePlugin.VERIFICATION_GROUP
+}
+basicLicenseClusterTest.mustRunAfter(tasks.precommit, tasks.integTestRunner)
+tasks.check.dependsOn(basicLicenseClusterTest)

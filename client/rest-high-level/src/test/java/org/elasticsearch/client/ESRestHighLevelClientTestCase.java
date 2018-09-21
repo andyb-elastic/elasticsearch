@@ -37,7 +37,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Collections;
-import java.util.Objects;
 
 public abstract class ESRestHighLevelClientTestCase extends ESRestTestCase {
 
@@ -145,12 +144,16 @@ public abstract class ESRestHighLevelClientTestCase extends ESRestTestCase {
 
     @Override
     protected Settings restClientSettings() {
-        final String user = Objects.requireNonNull(System.getProperty("tests.rest.cluster.username"));
-        final String pass = Objects.requireNonNull(System.getProperty("tests.rest.cluster.password"));
-        final String token = "Basic " + Base64.getEncoder().encodeToString((user + ":" + pass).getBytes(StandardCharsets.UTF_8));
-        return Settings.builder()
-            .put(super.restClientSettings())
-            .put(ThreadContext.PREFIX + ".Authorization", token)
-            .build();
+        final Settings.Builder builder = Settings.builder();
+        builder.put(super.restClientSettings());
+
+        final String user = System.getProperty("tests.rest.cluster.username");
+        final String pass = System.getProperty("tests.rest.cluster.password");
+        if (user != null && pass != null) {
+            final String token = "Basic " + Base64.getEncoder().encodeToString((user + ":" + pass).getBytes(StandardCharsets.UTF_8));
+            builder.put(ThreadContext.PREFIX + ".Authorization", token);
+        }
+
+        return builder.build();
     }
 }
