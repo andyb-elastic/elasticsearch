@@ -201,7 +201,7 @@ public class MADAggregator extends NumericMetricsAggregator.SingleValue {
 
             valuesSketch.centroids().forEach(centroid -> {
                 final double deviation = Math.abs(approximateMedian - centroid.mean());
-                approximatedDeviationsSketch.add(deviation);
+                approximatedDeviationsSketch.add(deviation, centroid.count());
             });
 
             return approximatedDeviationsSketch.quantile(0.5);

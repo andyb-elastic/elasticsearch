@@ -150,6 +150,7 @@ public class MedianAbsoluteDeviationIT extends AbstractNumericTestCase {
         if (randomBoolean()) {
             builder.setCompression(randomDoubleBetween(0, 1000, false));
         }
+        builder.setMethod("reduce_centroids");
         return builder;
     }
 
