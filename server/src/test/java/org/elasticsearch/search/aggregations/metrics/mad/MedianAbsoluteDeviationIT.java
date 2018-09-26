@@ -67,7 +67,7 @@ import static org.hamcrest.core.IsNull.notNullValue;
 
 public class MedianAbsoluteDeviationIT extends AbstractNumericTestCase {
 
-    private static final int MIN_SAMPLE_VALUE = 0;
+    private static final int MIN_SAMPLE_VALUE = -1000000;
     private static final int MAX_SAMPLE_VALUE = 1000000;
     private static final int NUMBER_OF_DOCS = 1000;
     private static final Supplier<Long> sampleSupplier = () -> randomLongBetween(MIN_SAMPLE_VALUE, MAX_SAMPLE_VALUE);

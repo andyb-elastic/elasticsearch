@@ -23,6 +23,7 @@ import org.hamcrest.Description;
 import org.hamcrest.TypeSafeMatcher;
 
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * This class is an implementation of median absolute deviation that computes an exact value, rather than an approximation. It's used to
@@ -30,9 +31,21 @@ import java.util.Arrays;
  */
 public class ExactMAD {
 
+    public static double calculateMAD(int[] sample) {
+        return calculateMAD(Arrays.stream(sample)
+            .mapToDouble(point -> (double) point)
+            .toArray());
+    }
+
     public static double calculateMAD(long[] sample) {
         return calculateMAD(Arrays.stream(sample)
             .mapToDouble(point -> (double) point)
+            .toArray());
+    }
+
+    public static double calculateMAD(List<Long> sample) {
+        return calculateMAD(sample.stream()
+            .mapToDouble(Long::doubleValue)
             .toArray());
     }
 
