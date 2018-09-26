@@ -31,6 +31,7 @@ import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.bucket.filter.Filter;
 import org.elasticsearch.search.aggregations.bucket.global.Global;
 import org.elasticsearch.search.aggregations.bucket.histogram.Histogram;
+import org.elasticsearch.search.aggregations.bucket.range.Range;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.elasticsearch.search.aggregations.metrics.AbstractNumericTestCase;
 
@@ -53,6 +54,7 @@ import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.filter;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.global;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.histogram;
+import static org.elasticsearch.search.aggregations.AggregationBuilders.range;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.terms;
 import static org.elasticsearch.search.aggregations.metrics.mad.ExactMAD.IsCloseToRelative.closeToRelative;
 import static org.elasticsearch.search.aggregations.metrics.mad.ExactMAD.calculateMAD;
@@ -478,6 +480,53 @@ public class MedianAbsoluteDeviationIT extends AbstractNumericTestCase {
             .flatMap(point -> LongStream.of(point, point + 1))
             .toArray());
         assertThat(mad.getMAD(), closeToRelative(fromIncrementedSampleMAD));
+    }
+
+    public void testAsSubAggregation() throws Exception {
+        final int rangeBoundary = (MAX_SAMPLE_VALUE + MIN_SAMPLE_VALUE) / 2;
+        final SearchResponse response = client()
+            .prepareSearch("idx")
+            .setQuery(matchAllQuery())
+            .addAggregation(
+                range("range")
+                    .field("value")
+                    .addRange(MIN_SAMPLE_VALUE, rangeBoundary)
+                    .addRange(rangeBoundary, MAX_SAMPLE_VALUE)
+                    .subAggregation(
+                        randomBuilder()
+                            .field("value")))
+            .execute()
+            .actionGet();
+
+        assertHitCount(response, NUMBER_OF_DOCS);
+
+        final long[] lowerBucketSample = Arrays.stream(singleValueSample)
+            .filter(point -> point >= MIN_SAMPLE_VALUE && point < rangeBoundary)
+            .toArray();
+        final long[] upperBucketSample = Arrays.stream(singleValueSample)
+            .filter(point -> point >= rangeBoundary && point < MAX_SAMPLE_VALUE)
+            .toArray();
+
+        final Range range = response.getAggregations().get("range");
+        assertThat(range, notNullValue());
+        List<? extends Range.Bucket> buckets = range.getBuckets();
+        assertThat(buckets, notNullValue());
+        assertThat(buckets, hasSize(2));
+
+        final Range.Bucket lowerBucket = buckets.get(0);
+        assertThat(lowerBucket, notNullValue());
+
+        final MedianAbsoluteDeviation lowerBucketMAD = lowerBucket.getAggregations().get("mad");
+        assertThat(lowerBucketMAD, notNullValue());
+        assertThat(lowerBucketMAD.getMAD(), closeToRelative(calculateMAD(lowerBucketSample)));
+
+        final Range.Bucket upperBucket = buckets.get(1);
+        assertThat(upperBucket, notNullValue());
+
+        final MedianAbsoluteDeviation upperBucketMAD = upperBucket.getAggregations().get("mad");
+        assertThat(upperBucketMAD, notNullValue());
+        assertThat(upperBucketMAD.getMAD(), closeToRelative(calculateMAD(upperBucketSample)));
+
     }
 
     @Override
