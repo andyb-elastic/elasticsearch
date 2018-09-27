@@ -48,9 +48,6 @@ public class MADAggregationBuilder extends LeafOnly<ValuesSource.Numeric, MADAgg
     public static final String NAME = "mad";
 
     private static final ParseField COMPRESSION_FIELD = new ParseField("compression");
-    private static final ParseField METHOD_FIELD = new ParseField("method"); // todo remove
-
-    public static final List<String> METHODS = Arrays.asList("collection_median", "reduce_percentiles", "reduce_centroids"); // todo remove
 
     private static final ObjectParser<MADAggregationBuilder, Void> PARSER;
 
@@ -58,7 +55,6 @@ public class MADAggregationBuilder extends LeafOnly<ValuesSource.Numeric, MADAgg
         PARSER = new ObjectParser<>(NAME);
         ValuesSourceParserHelper.declareNumericFields(PARSER, true, true, false); // todo verify these arguments
         PARSER.declareDouble(MADAggregationBuilder::setCompression, COMPRESSION_FIELD);
-        PARSER.declareString(MADAggregationBuilder::setMethod, METHOD_FIELD); // todo remove
     }
 
     public static MADAggregationBuilder parse(String aggregationName, XContentParser parser) throws IOException {
@@ -66,7 +62,6 @@ public class MADAggregationBuilder extends LeafOnly<ValuesSource.Numeric, MADAgg
     }
 
     private double compression = 100.0d;
-    private String method = "collection_median"; // todo remove
 
     public MADAggregationBuilder(String name) {
         super(name, ValuesSourceType.NUMERIC, ValueType.NUMERIC);
@@ -75,7 +70,6 @@ public class MADAggregationBuilder extends LeafOnly<ValuesSource.Numeric, MADAgg
     public MADAggregationBuilder(StreamInput in) throws IOException {
         super(in, ValuesSourceType.NUMERIC, ValueType.NUMERIC);
         compression = in.readDouble();
-        method = in.readString(); //todo remove
     }
 
     protected MADAggregationBuilder(MADAggregationBuilder clone,
@@ -83,7 +77,6 @@ public class MADAggregationBuilder extends LeafOnly<ValuesSource.Numeric, MADAgg
                                     Map<String, Object> metaData) {
         super(clone, factoriesBuilder, metaData);
         this.compression = clone.compression;
-        this.method = clone.method;  // todo remove
     }
 
     /**
@@ -105,19 +98,6 @@ public class MADAggregationBuilder extends LeafOnly<ValuesSource.Numeric, MADAgg
         return this;
     }
 
-    public String getMethod() { // todo remove
-        return method;
-    }
-
-    public MADAggregationBuilder setMethod(String method) { // todo remove
-        if (METHODS.contains(method) == false) {
-            throw new IllegalArgumentException("Invalid MAD method [" + method + "]");
-        }
-
-        this.method = method;
-        return this;
-    }
-
     @Override
     protected AggregationBuilder shallowCopy(AggregatorFactories.Builder factoriesBuilder, Map<String, Object> metaData) {
         return new MADAggregationBuilder(this, factoriesBuilder, metaData);
@@ -126,7 +106,6 @@ public class MADAggregationBuilder extends LeafOnly<ValuesSource.Numeric, MADAgg
     @Override
     protected void innerWriteTo(StreamOutput out) throws IOException {
         out.writeDouble(compression);
-        out.writeString(method); // todo remove
     }
 
     @Override
@@ -136,27 +115,25 @@ public class MADAggregationBuilder extends LeafOnly<ValuesSource.Numeric, MADAgg
                                                                                 AggregatorFactories.Builder subFactoriesBuilder)
                                                                                 throws IOException {
 
-        return new MADAggregatorFactory(name, config, context, parent, subFactoriesBuilder, metaData, compression, method);
+        return new MADAggregatorFactory(name, config, context, parent, subFactoriesBuilder, metaData, compression);
         // todo remove method
     }
 
     @Override
     protected XContentBuilder doXContentBody(XContentBuilder builder, Params params) throws IOException {
         builder.field(COMPRESSION_FIELD.getPreferredName(), compression);
-        builder.field(METHOD_FIELD.getPreferredName(), method); // todo remove
         return builder;
     }
 
     @Override
     protected int innerHashCode() {
-        return Objects.hash(compression, method);
+        return Objects.hash(compression);
     } // todo remove method
 
     @Override
     protected boolean innerEquals(Object obj) {
         MADAggregationBuilder other = (MADAggregationBuilder) obj;
-        return Objects.equals(compression, other.compression)
-            && Objects.equals(method, other.method); // todo remove
+        return Objects.equals(compression, other.compression);
     }
 
     @Override

@@ -37,63 +37,48 @@ import static org.elasticsearch.search.aggregations.metrics.mad.MADAggregator.co
 
 public class InternalMAD extends InternalNumericMetricsAggregation.SingleValue implements MedianAbsoluteDeviation {
 
-    private final TDigestState valueSketch;
     private final TDigestState deviationSketch;
-    private final String method;
 
     public InternalMAD(String name,
                        List<PipelineAggregator> pipelineAggregators,
                        Map<String, Object> metaData,
                        DocValueFormat format,
-                       TDigestState valueSketch,
-                       TDigestState deviationSketch,
-                       String method) {
+                       TDigestState deviationSketch) {
 
         super(name, pipelineAggregators, metaData);
         this.format = format;
-        this.valueSketch = valueSketch;
         this.deviationSketch = deviationSketch;
-        this.method = method;
     }
 
     public InternalMAD(StreamInput in) throws IOException {
         super(in);
         format = in.readNamedWriteable(DocValueFormat.class);
-        valueSketch = TDigestState.read(in);
         deviationSketch = TDigestState.read(in);
-        method = in.readString();
     }
 
     @Override
     protected void doWriteTo(StreamOutput out) throws IOException {
         out.writeNamedWriteable(format);
-        TDigestState.write(valueSketch, out);
         TDigestState.write(deviationSketch, out);
-        out.writeString(method);
     }
 
     @Override
     public InternalAggregation doReduce(List<InternalAggregation> aggregations, ReduceContext reduceContext) {
-        TDigestState valueMerged = null;
         TDigestState deviationMerged = null;
         for (InternalAggregation aggregation : aggregations) {
             final InternalMAD magAgg = (InternalMAD) aggregation;
-            if (valueMerged == null) {
-                valueMerged = new TDigestState(magAgg.valueSketch.compression());
-            }
             if (deviationMerged == null) {
                 deviationMerged = new TDigestState(magAgg.deviationSketch.compression());
             }
-            valueMerged.add(magAgg.valueSketch);
             deviationMerged.add(magAgg.deviationSketch);
         }
 
-        return new InternalMAD(name, pipelineAggregators(), metaData, format, valueMerged, deviationSketch, method);
+        return new InternalMAD(name, pipelineAggregators(), metaData, format, deviationSketch);
     }
 
     @Override
     public XContentBuilder doXContentBody(XContentBuilder builder, Params params) throws IOException {
-        final boolean anyResults = valueSketch.size() > 0;
+        final boolean anyResults = deviationSketch.size() > 0;
         final Double mad = anyResults
             ? getMAD()
             : null;
@@ -108,15 +93,13 @@ public class InternalMAD extends InternalNumericMetricsAggregation.SingleValue i
 
     @Override
     protected int doHashCode() {
-        return Objects.hash(valueSketch);
+        return Objects.hash(deviationSketch);
     }
 
     @Override
     protected boolean doEquals(Object obj) {
         InternalMAD other = (InternalMAD) obj;
-        return Objects.equals(valueSketch, other.valueSketch)
-            && Objects.equals(deviationSketch, other.deviationSketch)
-            && Objects.equals(method, other.method);
+        return Objects.equals(deviationSketch, other.deviationSketch);
     }
 
     @Override
@@ -132,6 +115,6 @@ public class InternalMAD extends InternalNumericMetricsAggregation.SingleValue i
     // todo maybe - compute this when the object is constructed so we don't have to build a new tdigest for the deviations every time
     @Override
     public double getMAD() {
-        return computeMAD(valueSketch, deviationSketch, method);
+        return computeMAD(deviationSketch);
     }
 }

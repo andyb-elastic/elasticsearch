@@ -35,7 +35,6 @@ import java.util.Map;
 public class MADAggregatorFactory extends ValuesSourceAggregatorFactory<ValuesSource.Numeric, MADAggregatorFactory> {
 
     private final double compression;
-    private final String method; // todo remove
 
     public MADAggregatorFactory(String name,
                                 ValuesSourceConfig<ValuesSource.Numeric> config,
@@ -43,11 +42,9 @@ public class MADAggregatorFactory extends ValuesSourceAggregatorFactory<ValuesSo
                                 AggregatorFactory<?> parent,
                                 AggregatorFactories.Builder subFactoriesBuilder,
                                 Map<String, Object> metaData,
-                                double compression,
-                                String method) throws IOException { // todo remove method
+                                double compression) throws IOException {
         super(name, config, context, parent, subFactoriesBuilder, metaData);
         this.compression = compression;
-        this.method = method;
     }
 
     @Override
@@ -55,7 +52,7 @@ public class MADAggregatorFactory extends ValuesSourceAggregatorFactory<ValuesSo
                                         List<PipelineAggregator> pipelineAggregators,
                                         Map<String, Object> metaData) throws IOException {
 
-        return new MADAggregator(name, context, parent, pipelineAggregators, metaData, null, config.format(), compression, method);
+        return new MADAggregator(name, context, parent, pipelineAggregators, metaData, null, config.format(), compression);
     }
 
     @Override
@@ -65,6 +62,6 @@ public class MADAggregatorFactory extends ValuesSourceAggregatorFactory<ValuesSo
                                           List<PipelineAggregator> pipelineAggregators,
                                           Map<String, Object> metaData) throws IOException {
 
-        return new MADAggregator(name, context, parent, pipelineAggregators, metaData, valuesSource, config.format(), compression, method);
+        return new MADAggregator(name, context, parent, pipelineAggregators, metaData, valuesSource, config.format(), compression);
     }
 }
