@@ -23,7 +23,6 @@ import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.search.ScoreMode;
 import org.elasticsearch.common.lease.Releasables;
 import org.elasticsearch.common.util.BigArrays;
-import org.elasticsearch.common.util.DoubleArray;
 import org.elasticsearch.common.util.ObjectArray;
 import org.elasticsearch.index.fielddata.SortedNumericDoubleValues;
 import org.elasticsearch.search.DocValueFormat;
@@ -47,11 +46,8 @@ public class MADAggregator extends NumericMetricsAggregator.SingleValue {
     private final DocValueFormat format;
 
     private final double compression;
-    private final String method; // todo remove
 
     private ObjectArray<TDigestState> valueSketches;
-    private ObjectArray<TDigestState> deviationSketches;
-    private DoubleArray approximateMedians;
 
     public MADAggregator(String name,
                          SearchContext context,
@@ -60,8 +56,7 @@ public class MADAggregator extends NumericMetricsAggregator.SingleValue {
                          Map<String, Object> metaData,
                          ValuesSource.Numeric valuesSource,
                          DocValueFormat format,
-                         double compression,
-                         String method) throws IOException { // todo remov methhod
+                         double compression) throws IOException {
 
         super(name, context, parent, pipelineAggregators, metaData);
 
@@ -69,10 +64,7 @@ public class MADAggregator extends NumericMetricsAggregator.SingleValue {
         this.format = format;
 
         this.valueSketches = context.bigArrays().newObjectArray(1);
-        this.deviationSketches = context.bigArrays().newObjectArray(1);
-        this.approximateMedians = context.bigArrays().newDoubleArray(1);
         this.compression = compression;
-        this.method = method; // todo remove
     }
 
     /*
@@ -85,7 +77,7 @@ public class MADAggregator extends NumericMetricsAggregator.SingleValue {
         if (owningBucketOrd >= valueSketches.size() || valueSketches.get(owningBucketOrd) == null) {
             return Double.NaN;
         } else {
-            return computeMAD(valueSketches.get(owningBucketOrd), deviationSketches.get(owningBucketOrd), method);
+            return computeMAD(valueSketches.get(owningBucketOrd));
         }
     }
 
@@ -112,13 +104,6 @@ public class MADAggregator extends NumericMetricsAggregator.SingleValue {
             public void collect(int doc, long bucket) throws IOException {
 
                 valueSketches = bigArrays.grow(valueSketches, bucket + 1);
-                deviationSketches = bigArrays.grow(deviationSketches, bucket + 1);
-
-                if (bucket >= approximateMedians.size()) {
-                    final long from = approximateMedians.size();
-                    approximateMedians = bigArrays.grow(approximateMedians, bucket + 1);
-                    approximateMedians.fill(from, approximateMedians.size(), Double.NEGATIVE_INFINITY); // todo use NaN? is neginf right
-                }
 
                 TDigestState valueSketch = valueSketches.get(bucket);
                 if (valueSketch == null) {
@@ -126,27 +111,11 @@ public class MADAggregator extends NumericMetricsAggregator.SingleValue {
                     valueSketches.set(bucket, valueSketch);
                 }
 
-                TDigestState deviationSketch = deviationSketches.get(bucket);
-                if (deviationSketch == null) {
-                    deviationSketch = new TDigestState(compression);
-                    deviationSketches.set(bucket, deviationSketch);
-                }
-
-                double approximateMedian = approximateMedians.get(bucket);
-
                 if (values.advanceExact(doc)) {
                     final int valueCount = values.docValueCount();
                     for (int i = 0; i < valueCount; i++) {
                         final double value = values.nextValue();
-                        if (approximateMedian == Double.NEGATIVE_INFINITY) {
-                            approximateMedian = value; // when starting out, we set approx median to the first value
-                        }
                         valueSketch.add(value);
-                        final double deviation = Math.abs(approximateMedian - value);
-                        deviationSketch.add(deviation);
-
-                        approximateMedian = valueSketch.quantile(0.5);
-                        approximateMedians.set(bucket, approximateMedian);
                     }
                 }
             }
@@ -159,54 +128,33 @@ public class MADAggregator extends NumericMetricsAggregator.SingleValue {
             return buildEmptyAggregation();
         } else {
             final TDigestState valueSketch = valueSketches.get(bucket);
-            final TDigestState deviationSketch = deviationSketches.get(bucket);
-            return new InternalMAD(name, pipelineAggregators(), metaData(), format, valueSketch, deviationSketch, method);
+            return new InternalMAD(name, pipelineAggregators(), metaData(), format, valueSketch);
         }
     }
 
     @Override
     public InternalAggregation buildEmptyAggregation() {
-        return new InternalMAD(name, pipelineAggregators(), metaData(), format,
-            new TDigestState(compression), new TDigestState(compression), method);
+        return new InternalMAD(name, pipelineAggregators(), metaData(), format, new TDigestState(compression));
     }
 
     @Override
     public void doClose() {
-        Releasables.close(valueSketches, deviationSketches, approximateMedians);
+        Releasables.close(valueSketches);
     }
 
     // todo maybe this should live elsewhere
-    public static double computeMAD(TDigestState valuesSketch, TDigestState deviationsSketch, String method) {
-        if (method.equals("collection_median")) {
+    public static double computeMAD(TDigestState valuesSketch) {
 
-            return deviationsSketch.quantile(0.5);
+        final double approximateMedian = valuesSketch.quantile(0.5);
+        final TDigestState approximateDeviationsSketch = new TDigestState(valuesSketch.compression());
 
-        } else if (method.equals("reduce_percentiles")) {
-
-            final double approximateMedian = valuesSketch.quantile(0.5);
-            final TDigestState approximateDeviationsSketch = new TDigestState(valuesSketch.compression());
-
-            for (int i = 1; i < 1000; i++) {
-                final double percentile = i / 1000d;
-                final double percentileValue = valuesSketch.quantile(percentile);
-                final double deviation = Math.abs(approximateMedian - percentileValue);
-                approximateDeviationsSketch.add(deviation);
-            }
-
-            return approximateDeviationsSketch.quantile(0.5);
-
-        } else if (method.equals("reduce_centroids")) {
-            final double approximateMedian = valuesSketch.quantile(0.5);
-            final TDigestState approximatedDeviationsSketch = new TDigestState(valuesSketch.compression());
-
-            valuesSketch.centroids().forEach(centroid -> {
-                final double deviation = Math.abs(approximateMedian - centroid.mean());
-                approximatedDeviationsSketch.add(deviation, centroid.count());
-            });
-
-            return approximatedDeviationsSketch.quantile(0.5);
-        } else {
-            throw new IllegalStateException("Invalid MAD method [" + method + "]");
+        for (int i = 1; i < 1000; i++) {
+            final double percentile = i / 1000d;
+            final double percentileValue = valuesSketch.quantile(percentile);
+            final double deviation = Math.abs(approximateMedian - percentileValue);
+            approximateDeviationsSketch.add(deviation);
         }
+
+        return approximateDeviationsSketch.quantile(0.5);
     }
 }
