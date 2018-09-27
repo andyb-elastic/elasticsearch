@@ -146,15 +146,13 @@ public class MADAggregator extends NumericMetricsAggregator.SingleValue {
     public static double computeMAD(TDigestState valuesSketch) {
 
         final double approximateMedian = valuesSketch.quantile(0.5);
-        final TDigestState approximateDeviationsSketch = new TDigestState(valuesSketch.compression());
+        final TDigestState approximatedDeviationsSketch = new TDigestState(valuesSketch.compression());
 
-        for (int i = 1; i < 1000; i++) {
-            final double percentile = i / 1000d;
-            final double percentileValue = valuesSketch.quantile(percentile);
-            final double deviation = Math.abs(approximateMedian - percentileValue);
-            approximateDeviationsSketch.add(deviation);
-        }
+        valuesSketch.centroids().forEach(centroid -> {
+            final double deviation = Math.abs(approximateMedian - centroid.mean());
+            approximatedDeviationsSketch.add(deviation, centroid.count());
+        });
 
-        return approximateDeviationsSketch.quantile(0.5);
+        return approximatedDeviationsSketch.quantile(0.5);
     }
 }

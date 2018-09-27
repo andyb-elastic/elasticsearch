@@ -150,7 +150,7 @@ public class MedianAbsoluteDeviationIT extends AbstractNumericTestCase {
     private static MADAggregationBuilder randomBuilder() {
         final MADAggregationBuilder builder = new MADAggregationBuilder("mad");
         if (randomBoolean()) {
-            builder.setCompression(randomDoubleBetween(0, 1000, false));
+            builder.setCompression(randomDoubleBetween(20, 1000, false));
         }
         return builder;
     }

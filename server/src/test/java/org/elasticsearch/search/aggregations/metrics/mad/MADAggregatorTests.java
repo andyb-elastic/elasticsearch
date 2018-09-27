@@ -149,7 +149,8 @@ public class MADAggregatorTests extends AggregatorTestCase {
                 IndexSearcher indexSearcher = newSearcher(indexReader, true, true);
 
                 MADAggregationBuilder builder = new MADAggregationBuilder("mad")
-                    .field("number");
+                    .field("number")
+                    .setCompression(randomDoubleBetween(20, 1000, true));
 
                 MappedFieldType fieldType = new NumberFieldMapper.NumberFieldType(NumberFieldMapper.NumberType.LONG);
                 fieldType.setName("number");
