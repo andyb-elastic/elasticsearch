@@ -131,19 +131,30 @@ public class MADAggregator extends NumericMetricsAggregator.SingleValue {
 
                 double approximateMedian = approximateMedians.get(bucket);
 
+                final int medianCalculationThreshold = 100;
+                final int medianCalculationInterval = 10;
                 if (values.advanceExact(doc)) {
+
                     final int valueCount = values.docValueCount();
                     for (int i = 0; i < valueCount; i++) {
+
                         final double value = values.nextValue();
+
+                        // when starting out, we set approx median to the first value
                         if (approximateMedian == Double.NEGATIVE_INFINITY) {
-                            approximateMedian = value; // when starting out, we set approx median to the first value
+                            approximateMedian = value;
+                            approximateMedians.set(bucket, approximateMedian);
                         }
+
                         valueSketch.add(value);
                         final double deviation = Math.abs(approximateMedian - value);
                         deviationSketch.add(deviation);
 
-                        approximateMedian = valueSketch.quantile(0.5);
-                        approximateMedians.set(bucket, approximateMedian);
+                        // we recalculate the median on every document up to a certain point, then only every 10 documents
+                        if (i < medianCalculationThreshold || (i > medianCalculationThreshold && i % medianCalculationInterval == 0)) {
+                            approximateMedian = valueSketch.quantile(0.5);
+                            approximateMedians.set(bucket, approximateMedian);
+                        }
                     }
                 }
             }
