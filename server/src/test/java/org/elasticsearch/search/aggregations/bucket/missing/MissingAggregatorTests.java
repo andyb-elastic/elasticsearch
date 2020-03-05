@@ -130,6 +130,31 @@ public class MissingAggregatorTests extends AggregatorTestCase {
             });
     }
 
+    public void testMissingParam() throws IOException {
+        try (Directory directory = newDirectory(); RandomIndexWriter writer = new RandomIndexWriter(random(), directory)) {
+            final Document doc = new Document();
+            doc.add(new SortedNumericDocValuesField("not_field", randomLong()));
+            writer.addDocument(doc);
+            writer.commit();
+
+            final MappedFieldType fieldType = new NumberFieldMapper.Builder("_name", NumberFieldMapper.NumberType.LONG).fieldType();
+            fieldType.setHasDocValues(true);
+            fieldType.setName("field");
+
+            MissingAggregationBuilder builder = new MissingAggregationBuilder("my_agg")
+                .field("field")
+                .missing(1);
+
+            try (IndexReader reader = writer.getReader()) {
+                IndexSearcher searcher = newSearcher(reader, true, true);
+                InternalMissing missing = search(searcher, Queries.newMatchAllQuery(), builder, fieldType);
+                assertEquals(0, missing.getDocCount());
+                assertFalse(AggregationInspectionHelper.hasValue(missing));
+            }
+
+        }
+    }
+
     private void testBothCases(int numDocs,
                                String fieldName,
                                Query query,
